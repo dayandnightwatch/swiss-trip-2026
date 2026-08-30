@@ -404,7 +404,7 @@ function normalizeState(raw){
  return {members:members.length?members:structuredClone(defaultState.members),expenses};
 }
 let state=normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'));
-let categoryChart,memberChart,cloudLoaded=false,isAdmin=false,cloudSaveTimer;
+let categoryChart,memberChart,cloudLoaded=false,isAdmin=false,cloudSaveTimer,suppressCloudSave=false,cloudSubscription;
 const expenseCats=['住宿','餐費','交通','採買','門票','停車','其他'];
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 function setCloudStatus(msg){ document.getElementById('cloudStatus').textContent=msg; }
@@ -417,7 +417,7 @@ async function saveCloudState(){
 }
 function save(){
  saveLocal();
- if(isAdmin&&cloudLoaded){ clearTimeout(cloudSaveTimer); cloudSaveTimer=setTimeout(saveCloudState,300); }
+ if(isAdmin&&cloudLoaded&&!suppressCloudSave){ clearTimeout(cloudSaveTimer); cloudSaveTimer=setTimeout(saveCloudState,300); }
 }
 function applyExpenseAccess(){
  const locked=!isAdmin;
@@ -452,7 +452,7 @@ function renderExpense(){
  const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
  document.getElementById('summaryCards').innerHTML=[['總預付款',totalPrepaid],['已收到預付款',receivedPrepaid],['總實際花費',totalExpense],[(totalPrepaid-totalExpense)>=0?'目前剩餘':'目前不足',Math.abs(totalPrepaid-totalExpense)],['平均每人負擔',avg],['總筆數',state.expenses.length]].map(([k,v])=>`<div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p class="text-xs text-slate-500">${k}</p><p class="mt-1 text-xl font-bold">${typeof v==='number'?fmt(v):v}</p></div>`).join('');
  document.getElementById('membersBox').innerHTML=state.members.map(m=>`<div class="rounded-2xl bg-slate-50 p-3" data-mid="${m.id}"><div class="grid gap-2 md:grid-cols-2"><input class="member-name rounded-xl border border-slate-200 px-3 py-2" value="${escapeHtml(m.name)}"><input class="member-prepaid rounded-xl border border-slate-200 px-3 py-2" type="number" min="0" value="${m.prepaid}"><label class="flex items-center gap-2 text-sm"><input class="member-received h-4 w-4" type="checkbox" ${m.received?'checked':''}>已收到預付款</label><input class="member-note rounded-xl border border-slate-200 px-3 py-2" placeholder="備註" value="${escapeHtml(m.note||'')}"></div><button class="delete-member mt-2 text-sm font-semibold text-red-600">刪除</button></div>`).join('');
- document.querySelectorAll('[data-mid]').forEach(box=>{ const id=box.dataset.mid, m=state.members.find(x=>x.id===id); box.querySelector('.member-name').oninput=e=>{m.name=e.target.value; renderExpense();}; box.querySelector('.member-prepaid').oninput=e=>{m.prepaid=Number(e.target.value)||0; renderExpense();}; box.querySelector('.member-received').onchange=e=>{m.received=e.target.checked; renderExpense();}; box.querySelector('.member-note').oninput=e=>{m.note=e.target.value; save();}; box.querySelector('.delete-member').onclick=()=>{ if(state.members.length<=1) return toast('至少需保留一位成員'); if(confirm('確定刪除此成員？相關花費紀錄不會自動刪除。')) {state.members=state.members.filter(x=>x.id!==id); state.expenses=state.expenses.map(e=>({...e, splitIds:e.splitIds.filter(s=>s!==id)})).filter(e=>e.payer!==id); renderExpense();}}; });
+ document.querySelectorAll('[data-mid]').forEach(box=>{ const id=box.dataset.mid, m=state.members.find(x=>x.id===id); const nameInput=box.querySelector('.member-name'); nameInput.oninput=e=>{m.name=e.target.value;saveLocal();if(!e.isComposing)renderExpense();}; nameInput.oncompositionend=e=>{m.name=e.target.value;renderExpense();saveCloudState();}; nameInput.onchange=()=>saveCloudState(); box.querySelector('.member-prepaid').oninput=e=>{m.prepaid=Number(e.target.value)||0;renderExpense();}; box.querySelector('.member-prepaid').onchange=()=>saveCloudState(); box.querySelector('.member-received').onchange=e=>{m.received=e.target.checked;renderExpense();saveCloudState();}; box.querySelector('.member-note').oninput=e=>{m.note=e.target.value;save();}; box.querySelector('.member-note').onchange=()=>saveCloudState(); box.querySelector('.delete-member').onclick=()=>{ if(state.members.length<=1) return toast('至少需保留一位成員'); if(confirm('確定刪除此成員？相關花費紀錄不會自動刪除。')) {state.members=state.members.filter(x=>x.id!==id); state.expenses=state.expenses.map(e=>({...e, splitIds:e.splitIds.filter(s=>s!==id)})).filter(e=>e.payer!==id); renderExpense();saveCloudState();}}; });
  const payer=document.querySelector('[name="payer"]'); payer.innerHTML='<option value="">選擇付款人</option>'+state.members.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
  document.querySelector('[name="category"]').innerHTML=expenseCats.map(c=>`<option>${c}</option>`).join('');
  document.getElementById('splitMembers').innerHTML=state.members.map(m=>`<label class="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"><input type="checkbox" value="${m.id}" checked> ${escapeHtml(m.name)}</label>`).join('');
@@ -481,11 +481,30 @@ document.getElementById('exportBtn').onclick=()=>{ const blob=new Blob([JSON.str
 document.getElementById('importFile').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const obj=JSON.parse(r.result); if(!obj.members || !obj.expenses) throw new Error(); state=obj; renderExpense(); toast('匯入完成'); }catch{ toast('匯入失敗：JSON 格式不正確'); } }; r.readAsText(f); };
 document.getElementById('copyLineBtn').onclick=async()=>{ const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc(); const ts=transfers(res); const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【每人結算】\n${res.map(r=>`${r.name}：${r.balance>0?'應收':r.balance<0?'應付':'打平'} ${fmt(Math.abs(r.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`; try{ await navigator.clipboard.writeText(txt); toast('已複製到剪貼簿'); }catch{ toast('複製失敗，請改用手動選取'); }};
 
-async function loadCloudState(){
+function applyCloudState(cloudState,status='已同步最新雲端資料'){
+ if(!cloudState) return;
+ suppressCloudSave=true;
+ state=normalizeState(cloudState);
+ saveLocal();
+ renderExpense();
+ suppressCloudSave=false;
+ setCloudStatus(status);
+}
+async function loadCloudState(refreshLogin=true){
  const {data,error}=await supabaseClient.from('trip_expense_state').select('state').eq('trip_id',TRIP_ID).maybeSingle();
  if(error){ console.error(error); setCloudStatus('雲端讀取失敗，暫時使用本機備份'); return; }
- if(data?.state){ state=normalizeState(data.state); saveLocal(); }
- cloudLoaded=true; setCloudStatus('已從 Supabase 載入'); renderExpense(); await refreshAuth();
+ if(data?.state) applyCloudState(data.state,'已從 Supabase 載入');
+ cloudLoaded=true;
+ if(!data?.state) renderExpense();
+ if(refreshLogin) await refreshAuth();
+}
+function subscribeCloudState(){
+ if(cloudSubscription) return;
+ cloudSubscription=supabaseClient.channel(`expense-${TRIP_ID}`)
+  .on('postgres_changes',{event:'*',schema:'public',table:'trip_expense_state',filter:`trip_id=eq.${TRIP_ID}`},payload=>{
+    if(payload.new?.state) applyCloudState(payload.new.state);
+  })
+  .subscribe();
 }
 async function refreshAuth(){
  const {data:{session}}=await supabaseClient.auth.getSession(); isAdmin=false;
@@ -499,7 +518,7 @@ async function refreshAuth(){
 }
 window.deleteExpense=(id)=>{ if(confirm('確定刪除此花費？')){ state.expenses=state.expenses.filter(e=>e.id!==id); renderExpense(); }};
 document.getElementById('addMemberBtn').onclick=()=>{state.members.push({id:crypto.randomUUID(),name:`成員${state.members.length+1}`,prepaid:0,received:false,note:''});renderExpense();};
-document.getElementById('expenseForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),splitIds=[...document.querySelectorAll('#splitMembers input:checked')].map(x=>x.value),amount=Number(fd.get('amount'));if(!amount||amount<=0)return toast('請輸入正確金額');if(!fd.get('payer'))return toast('請選擇付款人');if(!splitIds.length)return toast('至少選擇一位分攤人');state.expenses.push({id:crypto.randomUUID(),date:fd.get('date'),title:fd.get('title'),amount,payer:fd.get('payer'),category:fd.get('category'),note:fd.get('note'),splitIds});e.target.reset();renderExpense();toast('已新增花費');};
+document.getElementById('expenseForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),splitIds=[...document.querySelectorAll('#splitMembers input:checked')].map(x=>x.value),amount=Number(fd.get('amount'));if(!amount||amount<=0)return toast('請輸入正確金額');if(!fd.get('payer'))return toast('請選擇付款人');if(!splitIds.length)return toast('至少選擇一位分攤人');state.expenses.push({id:crypto.randomUUID(),date:fd.get('date'),title:fd.get('title'),amount,payer:fd.get('payer'),category:fd.get('category'),note:fd.get('note'),splitIds});e.target.reset();renderExpense();saveCloudState();toast('已新增花費');};
 document.getElementById('clearExpensesBtn').onclick=()=>{if(confirm('確定清除所有花費紀錄？')){state.expenses=[];renderExpense();}};
 document.getElementById('clearAllBtn').onclick=()=>{if(confirm('確定清除所有金流資料並恢復預設？')){state=structuredClone(defaultState);renderExpense();}};
 document.getElementById('importFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj.members||!obj.expenses)throw new Error();state=normalizeState(obj);renderExpense();toast('匯入完成');}catch{toast('匯入失敗：JSON 格式不正確');}};r.readAsText(f);};
@@ -507,8 +526,10 @@ document.getElementById('adminLoginBtn').onclick=()=>document.getElementById('ad
 document.getElementById('adminLoginForm').onsubmit=async e=>{e.preventDefault();const email=FIXED_ADMIN_EMAIL,password=document.getElementById('adminPassword').value;const {error}=await supabaseClient.auth.signInWithPassword({email,password});if(error){console.error(error);toast('帳號或密碼不正確');}else{document.getElementById('adminPassword').value='';toast('已登入管理模式');}};
 document.getElementById('adminLogoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();toast('已登出管理模式');};
 supabaseClient.auth.onAuthStateChange(event=>{if(['SIGNED_IN','SIGNED_OUT','TOKEN_REFRESHED'].includes(event))setTimeout(refreshAuth,0);});
+window.addEventListener('focus',()=>{if(cloudLoaded)loadCloudState(false);});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudLoaded)loadCloudState(false);});
 
-initTrip(); renderExpense(); loadCloudState();
+initTrip(); renderExpense(); subscribeCloudState(); loadCloudState();
 </script>
 </body>
 </html>
