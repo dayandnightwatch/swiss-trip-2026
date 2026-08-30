@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2026 趣瑞士｜歐洲旅行互動行程</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; }
+    .glass { backdrop-filter: blur(14px); background: rgba(255,255,255,.82); }
+    .tab-active { background: #0f766e; color: white; box-shadow: 0 10px 22px rgba(15,118,110,.18); }
+    .timeline-dot { box-shadow: 0 0 0 5px #ccfbf1; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .toast { transform: translateY(110%); transition: .25s ease; }
+    .toast.show { transform: translateY(0); }
+    @media print {
+      .no-print { display:none!important; }
+      .section { display:block!important; }
+      body { background:white!important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <header class="sticky top-0 z-40 border-b border-slate-200 glass no-print">
+    <div class="mx-auto max-w-7xl px-4 py-3">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold tracking-[.25em] text-teal-700">EUROPE TRIP 2026</p>
+          <h1 class="text-xl font-bold text-slate-900 md:text-2xl">2026 趣瑞士｜米蘭・瑞士・慕尼黑</h1>
+        </div>
+        <nav id="nav" class="flex gap-2 overflow-x-auto pb-1 text-sm font-semibold">
+          <button data-target="overview" class="nav-btn tab-active rounded-full px-4 py-2 whitespace-nowrap">行程總覽</button>
+          <button data-target="daily" class="nav-btn rounded-full px-4 py-2 whitespace-nowrap bg-white border border-slate-200">每日行程</button>
+          <button data-target="transport" class="nav-btn rounded-full px-4 py-2 whitespace-nowrap bg-white border border-slate-200">交通住宿</button>
+          <button data-target="food" class="nav-btn rounded-full px-4 py-2 whitespace-nowrap bg-white border border-slate-200">美食訂位</button>
+          <button data-target="expense" class="nav-btn rounded-full px-4 py-2 whitespace-nowrap bg-white border border-slate-200">金流分帳</button>
+          <button data-target="prep" class="nav-btn rounded-full px-4 py-2 whitespace-nowrap bg-white border border-slate-200">行前準備</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 md:py-8">
+    <section id="overview" class="section active">
+      <div class="grid gap-5 lg:grid-cols-3">
+        <div class="rounded-3xl bg-gradient-to-br from-teal-700 to-cyan-700 p-6 text-white lg:col-span-2">
+          <p class="text-sm opacity-90">2026/10/03 - 2026/10/15｜6 位大人</p>
+          <h2 class="mt-2 text-3xl font-bold md:text-4xl">從米蘭進入瑞士山景，再一路到慕尼黑返台</h2>
+          <p class="mt-4 max-w-3xl text-teal-50">這份互動式行程整合每日活動、包車與 Swiss Travel Pass 使用日、觀光列車資訊、住宿飯店、美食訂位與金流分帳。適合手機開啟，旅途中快速查找地點、路線與結算資訊。</p>
+          <div class="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div class="rounded-2xl bg-white/15 p-4"><p class="text-xs opacity-80">天數</p><p class="text-2xl font-bold">13 天</p></div>
+            <div class="rounded-2xl bg-white/15 p-4"><p class="text-xs opacity-80">城市</p><p class="text-2xl font-bold">6+</p></div>
+            <div class="rounded-2xl bg-white/15 p-4"><p class="text-xs opacity-80">成員</p><p class="text-2xl font-bold">6 位</p></div>
+            <div class="rounded-2xl bg-white/15 p-4"><p class="text-xs opacity-80">重點交通</p><p class="text-2xl font-bold">STP</p></div>
+          </div>
+        </div>
+        <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <h3 class="text-lg font-bold">旅程主線</h3>
+          <div id="routeChips" class="mt-4 flex flex-wrap gap-2"></div>
+          <div class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-100">
+            <p class="font-semibold">提醒</p>
+            <p class="mt-1">10/13 蘇黎世到新天鵝堡再到慕尼黑，文件標註超過 300 公里會加收費；若後續要補用車費，可放入金流分帳。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-5 lg:grid-cols-5">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 lg:col-span-3">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-lg font-bold">每日城市與移動總覽</h3>
+            <button onclick="showSection('daily')" class="rounded-full bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-700">看每日細節</button>
+          </div>
+          <div id="overviewCards" class="mt-4 grid gap-3 md:grid-cols-2"></div>
+        </div>
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 lg:col-span-2">
+          <h3 class="text-lg font-bold">交通方式分布</h3>
+          <p class="mt-1 text-sm text-slate-500">依每日主要交通方式統計。</p>
+          <div class="mt-5 h-64"><canvas id="transportChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="daily" class="section">
+      <div class="mb-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">每日行程 Timeline</h2>
+            <p class="mt-1 text-sm text-slate-500">點擊 Google Maps 可直接開啟地圖搜尋；停留時間為依行程節奏預估，可再微調。</p>
+          </div>
+          <div class="flex gap-2 overflow-x-auto" id="dayFilters"></div>
+        </div>
+      </div>
+      <div id="dailyTimeline" class="space-y-5"></div>
+    </section>
+
+    <section id="transport" class="section">
+      <div class="grid gap-5 lg:grid-cols-2">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h2 class="text-2xl font-bold">交通與移動重點</h2>
+          <div id="transportList" class="mt-4 space-y-3"></div>
+        </div>
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h2 class="text-2xl font-bold">住宿飯店總覽</h2>
+          <div id="hotelList" class="mt-4 space-y-3"></div>
+        </div>
+      </div>
+      <div class="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <h3 class="text-lg font-bold">火車體驗專區</h3>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <div class="rounded-2xl bg-sky-50 p-5 ring-1 ring-sky-100">
+            <p class="text-xs font-semibold tracking-widest text-sky-700">BERNINA EXPRESS</p>
+            <h4 class="mt-1 text-xl font-bold">Tirano → Chur / 瑞士</h4>
+            <p class="mt-2 text-sm text-slate-600">沿線重點包含 Brusio Circular Viaduct、Landwasser Viaduct、UNESCO 世界文化遺產鐵道路段。當天文件標註用車 AM7:30 - PM5，超過 300 公里約 360 KM。</p>
+          </div>
+          <div class="rounded-2xl bg-emerald-50 p-5 ring-1 ring-emerald-100">
+            <p class="text-xs font-semibold tracking-widest text-emerald-700">LUZERN - INTERLAKEN EXPRESS</p>
+            <h4 class="mt-1 text-xl font-bold">Interlaken Ost → Luzern</h4>
+            <p class="mt-2 text-sm text-slate-600">10/08 10:04 - 11:55，1st Class，Carriage 7 / Seat 313-318，車票類型：Swiss Travel Pass。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="food" class="section">
+      <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">美食與訂位清單</h2>
+            <p class="mt-1 text-sm text-slate-500">包含已訂位、現場候位、甜點咖啡與採買點。可依分類篩選。</p>
+          </div>
+          <div id="foodFilters" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div id="foodGrid" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+      </div>
+    </section>
+
+    <section id="expense" class="section">
+      <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">金流分帳</h2>
+            <p class="mt-1 text-sm text-slate-500">資料儲存在目前瀏覽器 localStorage。若換手機或電腦，請使用 JSON 匯出 / 匯入。</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="copyLineBtn" class="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white">複製 LINE 結算</button>
+            <button id="exportBtn" class="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">匯出 JSON</button>
+            <label class="cursor-pointer rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">匯入 JSON<input id="importFile" type="file" accept="application/json" class="hidden"></label>
+          </div>
+        </div>
+      </div>
+
+      <div id="summaryCards" class="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6"></div>
+
+      <div class="mt-5 grid gap-5 xl:grid-cols-5">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:col-span-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold">成員與預付款</h3>
+            <button id="addMemberBtn" class="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-700">新增成員</button>
+          </div>
+          <div id="membersBox" class="mt-4 space-y-3"></div>
+        </div>
+
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:col-span-3">
+          <h3 class="text-lg font-bold">新增花費</h3>
+          <form id="expenseForm" class="mt-4 grid gap-3 md:grid-cols-2">
+            <input name="date" type="date" class="rounded-2xl border border-slate-200 px-4 py-3" required>
+            <input name="title" type="text" placeholder="項目名稱，例如：少女峰午餐" class="rounded-2xl border border-slate-200 px-4 py-3" required>
+            <input name="amount" type="number" min="1" step="1" placeholder="金額" class="rounded-2xl border border-slate-200 px-4 py-3" required>
+            <select name="payer" class="rounded-2xl border border-slate-200 px-4 py-3" required></select>
+            <select name="category" class="rounded-2xl border border-slate-200 px-4 py-3"></select>
+            <input name="note" type="text" placeholder="備註，可留空" class="rounded-2xl border border-slate-200 px-4 py-3">
+            <div class="md:col-span-2">
+              <p class="mb-2 text-sm font-semibold text-slate-700">分攤人</p>
+              <div id="splitMembers" class="grid gap-2 sm:grid-cols-2 md:grid-cols-3"></div>
+            </div>
+            <div class="md:col-span-2 flex gap-2">
+              <button class="rounded-full bg-teal-700 px-5 py-3 font-semibold text-white" type="submit">新增花費</button>
+              <button class="rounded-full bg-slate-100 px-5 py-3 font-semibold text-slate-700" type="reset">清空表單</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="mt-5 grid gap-5 xl:grid-cols-2">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 class="text-lg font-bold">分類花費</h3>
+          <div class="mt-4 h-72"><canvas id="categoryExpenseChart"></canvas></div>
+        </div>
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 class="text-lg font-bold">每人已付 vs 應付</h3>
+          <div class="mt-4 h-72"><canvas id="memberExpenseChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid gap-5 xl:grid-cols-2">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 class="text-lg font-bold">每人結算</h3>
+          <div id="settlementTable" class="mt-4 overflow-x-auto"></div>
+        </div>
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h3 class="text-lg font-bold">誰該付誰</h3>
+          <div id="transferList" class="mt-4 space-y-3"></div>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold">花費紀錄</h3>
+          <div class="flex gap-2">
+            <button id="clearExpensesBtn" class="rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700">清除花費</button>
+            <button id="clearAllBtn" class="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">清除全部</button>
+          </div>
+        </div>
+        <div id="expenseRecords" class="mt-4 space-y-3"></div>
+      </div>
+    </section>
+
+    <section id="prep" class="section">
+      <div class="grid gap-5 lg:grid-cols-2">
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h2 class="text-2xl font-bold">行前準備清單</h2>
+          <div id="prepList" class="mt-4 space-y-3"></div>
+        </div>
+        <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <h2 class="text-2xl font-bold">旅途中提醒</h2>
+          <ul class="mt-4 space-y-3 text-sm text-slate-700">
+            <li class="rounded-2xl bg-slate-50 p-4">包車日請前一晚確認隔天集合時間、行李數與上車地點。</li>
+            <li class="rounded-2xl bg-slate-50 p-4">Swiss Travel Pass 日請提前確認票券、身分證明文件與列車月台。</li>
+            <li class="rounded-2xl bg-slate-50 p-4">山區行程如少女峰、雪朗峰、石丹峰，建議早上先查天氣與纜車營運狀態。</li>
+            <li class="rounded-2xl bg-slate-50 p-4">金流分帳建議每日晚上回飯店後整理一次，避免跨國多幣別記錄遺漏。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast fixed bottom-4 left-4 right-4 z-50 rounded-2xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-xl md:left-auto md:w-96 no-print"></div>
+
+<script>
+const mapUrl = (q) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+const fmt = (n) => `NT$ ${Math.round(Number(n)||0).toLocaleString('zh-TW')}`;
+const escapeHtml = (str='') => String(str).replace(/[&<>'"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s]));
+
+const tripDays = [
+ {date:'10/03', weekday:'星期六', city:'義大利米蘭', hotel:'Duomo Hotel & Apartment', transport:'包車', area:'米蘭市區', notes:'用車 AM10 - PM6，300 公里以內', items:[
+  ['11:30','Marchesi 1824 Prada Cafe','下午茶 / 咖啡','90 分鐘','Marchesi 1824 Prada Cafe Milan'],
+  ['13:30','時尚四邊形 Quadrilatero della Moda','逛街','90 分鐘','Quadrilatero della Moda Milan'],
+  ['15:00','艾曼紐二世迴廊 + Corso Vittorio Emanuele II','拍照 / 逛街','90 分鐘','Galleria Vittorio Emanuele II Milan'],
+  ['16:30','Rinascente Milano','百貨 / 採買','60 分鐘','Rinascente Milano'],
+  ['17:30','Panzerotti Luini / Cioccolatitaliani','小吃 / 冰淇淋','45 分鐘','Luini Milan'],
+  ['18:30','Ristorante Paper Moon Giardino','晚餐，已訂位','120 分鐘','Ristorante Paper Moon Giardino Milan'] ]},
+ {date:'10/04', weekday:'星期日', city:'義大利 Tirano', hotel:'HOTEL STELVIO TIRANO', transport:'包車', area:'米蘭 to Tirano', notes:'用車 AM10 - PM8，下午四點前離開米蘭', items:[
+  ['10:30','和平之門 Arco della Pace','景點','45 分鐘','Arco della Pace Milan'],
+  ['12:00','10 Corso Como Café','午餐，分兩桌 3+3','90 分鐘','10 Corso Como Café Milan'],
+  ['13:45','CREMA Alta Gelateria','Gelato','30 分鐘','CREMA Alta Gelateria Milan'],
+  ['14:30','Eataly 超市','採買 / 逛超市','60 分鐘','Eataly Milano Smeraldo'],
+  ['15:30','Pasticceria Martesana Mercato Centrale','買糕點','30 分鐘','Pasticceria Martesana Mercato Centrale Milano'],
+  ['16:00','離開米蘭前往 Tirano','移動','約 2.5-3 小時','Tirano Italy'],
+  ['19:00','Tirano 晚餐','晚餐','90 分鐘','Tirano restaurants'] ]},
+ {date:'10/05', weekday:'星期一', city:'因特拉肯', hotel:'The Golf Apartments', transport:'包車 + 伯連納火車', area:'Tirano to 瑞士', notes:'用車 AM7:30 - PM5，超過 300 公里約 360 KM', items:[
+  ['上午','伯連納觀光火車 Bernina Express','Tirano to Chur，一路北上進入瑞士','約 4 小時','Bernina Express Tirano'],
+  ['沿途','Brusio Circular Viaduct','伯連納線代表性鐵路工程','車上觀景','Brusio Circular Viaduct'],
+  ['沿途','Landwasser Viaduct','阿爾布拉線經典高架橋與隧道畫面','車上觀景','Landwasser Viaduct'],
+  ['晚上','Le Cèdre Interlaken','晚餐推薦','90 分鐘','Le Cèdre Interlaken'] ]},
+ {date:'10/06', weekday:'星期二', city:'因特拉肯', hotel:'The Golf Apartments', transport:'Swiss Travel Pass', area:'瑞士少女峰區域', notes:'山區天氣變化大，建議早起查即時影像與纜車狀態', items:[
+  ['上午','少女峰 Jungfraujoch','高山景點','半日到一日','Jungfraujoch Switzerland'],
+  ['中午','少女峰區域午餐','山區餐廳','60 分鐘','Jungfraujoch restaurants'],
+  ['下午','Interlaken / Grindelwald 周邊','依天氣彈性安排','2-3 小時','Grindelwald Switzerland'] ]},
+ {date:'10/07', weekday:'星期三', city:'因特拉肯', hotel:'The Golf Apartments', transport:'Swiss Travel Pass', area:'瑞士雪朗峰區域', notes:'雪朗峰與米倫區域建議保留拍照與散步時間', items:[
+  ['上午','雪朗峰 Schilthorn','高山景點','半日','Schilthorn Switzerland'],
+  ['中午','雪朗峰區域午餐','山區餐廳','60-90 分鐘','Schilthorn Piz Gloria'],
+  ['下午','Mürren / Lauterbrunnen 周邊','散步 / 拍照','2 小時','Mürren Switzerland'] ]},
+ {date:'10/08', weekday:'星期四', city:'Luzern 琉森', hotel:'Hotel Astoria', transport:'STP + 黃金列車', area:'因特拉肯 to 琉森', notes:'Luzern-Interlaken Express 10:04 - 11:55，1st Class Carriage 7 / Seat 313-318', items:[
+  ['10:04','Luzern - Interlaken Express','Interlaken Ost → Luzern','1 小時 51 分','Interlaken Ost railway station'],
+  ['12:15','Pastarazzi','午餐，未訂位','75 分鐘','Pastarazzi Luzern'],
+  ['14:00','卡貝爾木橋 Chapel Bridge','琉森地標，Jesuitenplatz 拍照','60 分鐘','Chapel Bridge Lucerne'],
+  ['15:30','Läderach / Confiserie Sprüngli / Müller','採買甜點與逛街','90 分鐘','Läderach Luzern'],
+  ['晚上','飯店餐廳拉麵','晚餐','60-90 分鐘','Hotel Astoria Luzern restaurant'] ]},
+ {date:'10/09', weekday:'星期五', city:'Luzern 琉森', hotel:'Hotel Astoria', transport:'Swiss Travel Pass', area:'琉森 + 石丹峰區域', notes:'早上可在飯店 coffee shop 吃早餐', items:[
+  ['上午','石丹峰 Stanserhorn','山區景點','半日','Stanserhorn Switzerland'],
+  ['中午','石丹峰區域午餐','午餐','60 分鐘','Stanserhorn restaurant'],
+  ['17:30','Bolero','晚餐，已訂位','120 分鐘','Bolero Luzern'] ]},
+ {date:'10/10', weekday:'星期六', city:'蘇黎世', hotel:'Aparthotel Adagio Zurich City Center', transport:'包車', area:'琉森 to 蘇黎世', notes:'前一天買好早餐，AM10:30 包車出發蘇黎世', items:[
+  ['10:30','琉森出發前往蘇黎世','包車移動','約 1 小時','Zurich Switzerland'],
+  ['12:00','Babu’s','中餐','90 分鐘','Babu’s Zurich'],
+  ['14:00','林登霍夫山 Lindenhof','蘇黎世市區景點','45 分鐘','Lindenhof Zurich'],
+  ['15:00','飯店 check in','入住','45 分鐘','Aparthotel Adagio Zurich City Center'],
+  ['16:00','St. Peter Church / 河畔散步','市區散步','90 分鐘','St Peter Church Zurich'],
+  ['17:30','Tsugi Bakery & Café','買隔天早餐麵包','30 分鐘','Tsugi Bakery Cafe Zurich'],
+  ['18:00','Simon Says Taste Taiwan','晚餐，已訂位','120 分鐘','Simon Says Taste Taiwan Zurich'] ]},
+ {date:'10/11', weekday:'星期日', city:'蘇黎世', hotel:'Aparthotel Adagio Zurich City Center', transport:'包車', area:'蘇黎世周邊', notes:'蘇黎世 → 萊茵瀑布 → Stein am Rhein → 蘇黎世', items:[
+  ['10:00','蘇黎世出發','包車移動','約 45-60 分鐘','Rhine Falls'],
+  ['上午','萊茵瀑布 Rhine Falls','建議由 Schloss Laufen 側觀景','90 分鐘','Schloss Laufen Rhine Falls'],
+  ['12:30','Lunas Crêpes','中餐，未訂位','75 分鐘','Lunas Crêpes Stein am Rhein'],
+  ['下午','Stein am Rhein','中世紀彩繪小鎮','2 小時','Stein am Rhein Altstadt'],
+  ['下午','Rathausplatz','市政廳廣場與壁畫建築','45 分鐘','Rathausplatz Stein am Rhein'],
+  ['晚上','Rheinfelder Bierhalle','晚餐，無法訂位','90 分鐘','Rheinfelder Bierhalle Zurich'] ]},
+ {date:'10/12', weekday:'星期一', city:'蘇黎世', hotel:'Aparthotel Adagio Zurich City Center', transport:'包車', area:'蘇黎世區域', notes:'用車 9:00 - 19:00，300 公里以內', items:[
+  ['09:00','出發巧克力工廠','前往 10:00 場','60 分鐘','Lindt Home of Chocolate Zurich'],
+  ['10:00','巧克力工廠','參觀體驗','2 小時','Lindt Home of Chocolate'],
+  ['12:30','Confiserie Sprüngli | Café-Bar','中餐，現場候位','90 分鐘','Confiserie Sprüngli Café-Bar Zurich'],
+  ['14:30','Bahnhofstrasse','精品購物大道，頭到尾路程約 15 分鐘','90 分鐘','Bahnhofstrasse Zurich'],
+  ['下午','Confiseur Bachmann / Läderach / Sprüngli','甜點採買','90 分鐘','Confiseur Bachmann Zurich'],
+  ['晚上','Ayverdi’s Bahnhofplatz','晚餐','90 分鐘','Ayverdi’s Bahnhofplatz Zurich'] ]},
+ {date:'10/13', weekday:'星期二', city:'慕尼黑', hotel:'Hotel Europa', transport:'包車', area:'蘇黎世 to 新天鵝堡 to 慕尼黑', notes:'超過 300 公里，會加收費', items:[
+  ['10:00','蘇黎世出發','包車長距離移動','依路況','Neuschwanstein Castle'],
+  ['中午','HANS IM GLÜCK - ST. GALLEN Kugelgasse','中餐','90 分鐘','HANS IM GLÜCK St Gallen Kugelgasse'],
+  ['下午','新天鵝堡 Neuschwanstein Castle','景點','2-3 小時','Neuschwanstein Castle Germany'],
+  ['19:00','Trattoria San Benno','晚餐，已訂位','120 分鐘','Trattoria San Benno Munich'] ]},
+ {date:'10/14', weekday:'星期三', city:'慕尼黑', hotel:'Hotel Europa', transport:'包車', area:'慕尼黑市區', notes:'用車 AM10 - PM8，300 公里以內', items:[
+  ['12:00','Hofbräuhaus München','中餐，已訂位 6 位','90 分鐘','Hofbräuhaus München'],
+  ['14:00','Schmalznudel - Cafe Frischhut','咖啡 / 甜點','45 分鐘','Schmalznudel Cafe Frischhut Munich'],
+  ['15:00','Viktualienmarkt','農夫市集','75 分鐘','Viktualienmarkt Munich'],
+  ['16:30','Eataly Munich','逛街 / 採買','60 分鐘','Eataly Munich'],
+  ['18:00','Ha - Vietnamese Delight','晚餐，已訂位 6 位','90 分鐘','Ha Vietnamese Delight Munich'] ]},
+ {date:'10/15', weekday:'星期四', city:'回台灣', hotel:'-', transport:'德國中午 12:00 飛機', area:'10/16 早上抵台灣', notes:'預留退房、機場報到與退稅時間', items:[
+  ['上午','飯店退房 / 前往機場','移動','依航班安排','Munich Airport'],
+  ['12:00','德國起飛回台灣','航班','-', 'Munich Airport'] ]}
+];
+
+const foods = [
+ ['10/03','Marchesi 1824 Prada Cafe','咖啡甜點','偏下午茶','Marchesi 1824 Prada Cafe Milan'], ['10/03','Panzerotti Luini','小吃','在大教堂旁邊','Luini Milan'], ['10/03','Cioccolatitaliani','甜點','義式冰淇淋','Cioccolatitaliani Milan'], ['10/03','Ristorante Paper Moon Giardino','已訂位','18:30','Ristorante Paper Moon Giardino Milan'],
+ ['10/04','10 Corso Como Café','已訂位','12:00 分兩桌 3+3','10 Corso Como Café Milan'], ['10/04','CREMA Alta Gelateria','甜點','Gelato','CREMA Alta Gelateria Milan'], ['10/04','Eataly Milano','採買','超市','Eataly Milano Smeraldo'], ['10/04','Pasticceria Martesana Mercato Centrale','甜點','買糕點','Pasticceria Martesana Mercato Centrale Milano'],
+ ['10/05','Le Cèdre Interlaken','推薦','晚餐推薦','Le Cèdre Interlaken'], ['10/08','Pastarazzi','未訂位','在琉森飯店旁','Pastarazzi Luzern'], ['10/09','Bolero','已訂位','17:30','Bolero Luzern'], ['10/10','Babu’s','午餐','中餐','Babu’s Zurich'], ['10/10','Tsugi Bakery & Café','早餐採買','買隔天早餐','Tsugi Bakery Cafe Zurich'], ['10/10','Simon Says Taste Taiwan','已訂位','18:00','Simon Says Taste Taiwan Zurich'],
+ ['10/11','Lunas Crêpes','未訂位','中餐','Lunas Crêpes Stein am Rhein'], ['10/11','Rheinfelder Bierhalle','無法訂位','晚餐','Rheinfelder Bierhalle Zurich'], ['10/12','Confiserie Sprüngli | Café-Bar','現場候位','中餐','Confiserie Sprüngli Café-Bar Zurich'], ['10/12','Ayverdi’s Bahnhofplatz','晚餐','晚餐','Ayverdi’s Bahnhofplatz Zurich'], ['10/13','HANS IM GLÜCK - ST. GALLEN Kugelgasse','午餐','中餐','HANS IM GLÜCK St Gallen Kugelgasse'], ['10/13','Trattoria San Benno','已訂位','19:00','Trattoria San Benno Munich'], ['10/14','Hofbräuhaus München','已訂位','12:00 六位','Hofbräuhaus München'], ['10/14','Schmalznudel - Cafe Frischhut','咖啡甜點','咖啡','Schmalznudel Cafe Frischhut Munich'], ['10/14','Eataly Munich','採買','逛逛','Eataly Munich'], ['10/14','Ha - Vietnamese Delight','已訂位','18:00 六位','Ha Vietnamese Delight Munich']
+].map(([date,name,cat,note,q]) => ({date,name,cat,note,q}));
+
+const hotels = [
+ ['10/03','米蘭','Duomo Hotel & Apartment'], ['10/04','Tirano','HOTEL STELVIO TIRANO'], ['10/05-10/07','因特拉肯','The Golf Apartments Interlaken'], ['10/08-10/09','琉森','Hotel Astoria Luzern'], ['10/10-10/12','蘇黎世','Aparthotel Adagio Zurich City Center'], ['10/13-10/14','慕尼黑','Hotel Europa Munich']
+];
+
+function showSection(id){
+ document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active', s.id===id));
+ document.querySelectorAll('.nav-btn').forEach(b=>{
+  const active=b.dataset.target===id; b.className = `nav-btn rounded-full px-4 py-2 whitespace-nowrap ${active?'tab-active':'bg-white border border-slate-200'}`;
+ });
+ window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>showSection(b.dataset.target)));
+
+function initTrip(){
+ document.getElementById('routeChips').innerHTML = ['米蘭','Tirano','因特拉肯','琉森','蘇黎世','新天鵝堡','慕尼黑'].map(c=>`<span class="rounded-full bg-white/15 px-3 py-1 text-sm">${c}</span>`).join('');
+ document.getElementById('overviewCards').innerHTML = tripDays.map(d=>`<div class="rounded-2xl border border-slate-200 p-4 hover:border-teal-300"><div class="flex items-start justify-between gap-2"><div><p class="text-sm font-semibold text-teal-700">${d.date} ${d.weekday}</p><h4 class="font-bold text-slate-900">${d.city}</h4></div><span class="rounded-full bg-slate-100 px-2 py-1 text-xs">${d.transport}</span></div><p class="mt-2 text-sm text-slate-600">${d.area}</p><p class="mt-1 text-xs text-slate-500">住宿：${d.hotel}</p></div>`).join('');
+ document.getElementById('dayFilters').innerHTML = `<button onclick="renderTimeline('all')" class="day-filter rounded-full bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white">全部</button>` + tripDays.map(d=>`<button onclick="renderTimeline('${d.date}')" class="day-filter rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 border border-slate-200">${d.date}</button>`).join('');
+ renderTimeline('all');
+ document.getElementById('transportList').innerHTML = tripDays.map(d=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="flex items-center justify-between gap-3"><div><p class="text-sm font-semibold text-teal-700">${d.date} ${d.weekday}</p><h4 class="font-bold">${d.area}</h4></div><span class="rounded-full bg-white px-3 py-1 text-xs font-semibold ring-1 ring-slate-200">${d.transport}</span></div><p class="mt-2 text-sm text-slate-600">${d.notes}</p></div>`).join('');
+ document.getElementById('hotelList').innerHTML = hotels.map(([date,city,name])=>`<div class="rounded-2xl bg-slate-50 p-4"><p class="text-sm font-semibold text-teal-700">${date}｜${city}</p><div class="mt-1 flex items-center justify-between gap-2"><h4 class="font-bold">${name}</h4><a class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-teal-700 ring-1 ring-slate-200" target="_blank" href="${mapUrl(name)}">Maps</a></div></div>`).join('');
+ const cats=[...new Set(foods.map(f=>f.cat))];
+ document.getElementById('foodFilters').innerHTML=`<button data-cat="all" class="food-filter rounded-full bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white">全部</button>`+cats.map(c=>`<button data-cat="${c}" class="food-filter rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 border border-slate-200">${c}</button>`).join('');
+ document.querySelectorAll('.food-filter').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.food-filter').forEach(x=>x.className='food-filter rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 border border-slate-200'); b.className='food-filter rounded-full bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white'; renderFoods(b.dataset.cat);}));
+ renderFoods('all');
+ document.getElementById('prepList').innerHTML = ['護照、簽證與旅平險','機票、飯店訂房與包車聯繫資料','Swiss Travel Pass 與觀光列車座位資訊','歐規轉接頭、行動電源、網卡 / eSIM','山區保暖衣物、防水外套、好走鞋','常備藥、暈車藥、腸胃藥','金流分帳：先設定 6 位成員與預付款','每日 Google Maps 離線地圖或收藏地點'].map((x,i)=>`<label class="flex items-center gap-3 rounded-2xl bg-slate-50 p-4"><input type="checkbox" class="h-5 w-5 rounded border-slate-300 text-teal-700"><span class="text-sm font-medium">${x}</span></label>`).join('');
+ renderTransportChart();
+}
+function renderTimeline(filter){
+ const ds = filter==='all' ? tripDays : tripDays.filter(d=>d.date===filter);
+ document.getElementById('dailyTimeline').innerHTML = ds.map(d=>`<article class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between"><div><p class="text-sm font-semibold text-teal-700">${d.date} ${d.weekday}</p><h3 class="text-xl font-bold">${d.city}｜${d.area}</h3><p class="mt-1 text-sm text-slate-500">住宿：${d.hotel}｜交通：${d.transport}</p></div><p class="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">${d.notes}</p></div><div class="mt-5 border-l-2 border-teal-100 pl-5 space-y-5">${d.items.map(item=>`<div class="relative"><span class="timeline-dot absolute -left-[30px] top-1.5 h-3 w-3 rounded-full bg-teal-600"></span><div class="rounded-2xl bg-slate-50 p-4"><div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p class="text-sm font-bold text-slate-900">${item[0]}｜${item[1]}</p><p class="mt-1 text-sm text-slate-600">${item[2]}</p></div><a target="_blank" class="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 ring-1 ring-slate-200" href="${mapUrl(item[4])}">Google Maps</a></div><p class="mt-2 text-xs text-slate-500">建議停留：${item[3]}</p></div></div>`).join('')}</div></article>`).join('');
+}
+function renderFoods(cat){
+ const fs = cat==='all' ? foods : foods.filter(f=>f.cat===cat);
+ document.getElementById('foodGrid').innerHTML = fs.map(f=>`<div class="rounded-2xl border border-slate-200 p-4"><div class="flex items-start justify-between gap-2"><div><p class="text-xs font-semibold text-teal-700">${f.date}｜${f.cat}</p><h4 class="mt-1 font-bold">${f.name}</h4></div><a target="_blank" class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700" href="${mapUrl(f.q)}">Maps</a></div><p class="mt-2 text-sm text-slate-600">${f.note}</p></div>`).join('');
+}
+function renderTransportChart(){
+ const counts={}; tripDays.forEach(d=>counts[d.transport]=(counts[d.transport]||0)+1);
+ new Chart(document.getElementById('transportChart'), {type:'doughnut', data:{labels:Object.keys(counts), datasets:[{data:Object.values(counts)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}});
+}
+
+// Expense module
+const STORAGE_KEY='swiss_trip_expense_v1';
+const defaultState={members:[
+ {id:crypto.randomUUID(), name:'Wayne', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員A', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員B', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員C', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員D', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員E', prepaid:0, received:false, note:''}
+], expenses:[]};
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultState;
+let categoryChart, memberChart;
+const expenseCats=['住宿','餐費','交通','採買','門票','停車','其他'];
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function calc(){
+ const res=state.members.map(m=>({id:m.id,name:m.name,prepaid:Number(m.prepaid)||0,received:m.received, paid:0, owe:0, balance:0}));
+ const byId=Object.fromEntries(res.map(r=>[r.id,r]));
+ state.expenses.forEach(e=>{ if(byId[e.payer]) byId[e.payer].paid += Number(e.amount)||0; const per=(Number(e.amount)||0)/(e.splitIds?.length||1); (e.splitIds||[]).forEach(id=>{ if(byId[id]) byId[id].owe+=per; }); });
+ res.forEach(r=> r.balance = r.prepaid + r.paid - r.owe);
+ const totalExpense=state.expenses.reduce((s,e)=>s+Number(e.amount||0),0), totalPrepaid=res.reduce((s,r)=>s+r.prepaid,0), receivedPrepaid=res.filter(r=>r.received).reduce((s,r)=>s+r.prepaid,0);
+ return {res,totalExpense,totalPrepaid,receivedPrepaid,avg: state.members.length?totalExpense/state.members.length:0};
+}
+function transfers(res){
+ const debtors=res.filter(r=>r.balance < -0.5).map(r=>({name:r.name, amount:Math.round(-r.balance)}));
+ const creditors=res.filter(r=>r.balance > 0.5).map(r=>({name:r.name, amount:Math.round(r.balance)}));
+ const out=[]; let i=0,j=0;
+ while(i<debtors.length && j<creditors.length){ const amt=Math.min(debtors[i].amount, creditors[j].amount); if(amt>0) out.push({from:debtors[i].name,to:creditors[j].name,amount:amt}); debtors[i].amount-=amt; creditors[j].amount-=amt; if(debtors[i].amount===0)i++; if(creditors[j].amount===0)j++; }
+ return out;
+}
+function renderExpense(){
+ save();
+ const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
+ document.getElementById('summaryCards').innerHTML=[['總預付款',totalPrepaid],['已收到預付款',receivedPrepaid],['總實際花費',totalExpense],[(totalPrepaid-totalExpense)>=0?'目前剩餘':'目前不足',Math.abs(totalPrepaid-totalExpense)],['平均每人負擔',avg],['總筆數',state.expenses.length]].map(([k,v])=>`<div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p class="text-xs text-slate-500">${k}</p><p class="mt-1 text-xl font-bold">${typeof v==='number'?fmt(v):v}</p></div>`).join('');
+ document.getElementById('membersBox').innerHTML=state.members.map(m=>`<div class="rounded-2xl bg-slate-50 p-3" data-mid="${m.id}"><div class="grid gap-2 md:grid-cols-2"><input class="member-name rounded-xl border border-slate-200 px-3 py-2" value="${escapeHtml(m.name)}"><input class="member-prepaid rounded-xl border border-slate-200 px-3 py-2" type="number" min="0" value="${m.prepaid}"><label class="flex items-center gap-2 text-sm"><input class="member-received h-4 w-4" type="checkbox" ${m.received?'checked':''}>已收到預付款</label><input class="member-note rounded-xl border border-slate-200 px-3 py-2" placeholder="備註" value="${escapeHtml(m.note||'')}"></div><button class="delete-member mt-2 text-sm font-semibold text-red-600">刪除</button></div>`).join('');
+ document.querySelectorAll('[data-mid]').forEach(box=>{ const id=box.dataset.mid, m=state.members.find(x=>x.id===id); box.querySelector('.member-name').oninput=e=>{m.name=e.target.value; renderExpense();}; box.querySelector('.member-prepaid').oninput=e=>{m.prepaid=Number(e.target.value)||0; renderExpense();}; box.querySelector('.member-received').onchange=e=>{m.received=e.target.checked; renderExpense();}; box.querySelector('.member-note').oninput=e=>{m.note=e.target.value; save();}; box.querySelector('.delete-member').onclick=()=>{ if(state.members.length<=1) return toast('至少需保留一位成員'); if(confirm('確定刪除此成員？相關花費紀錄不會自動刪除。')) {state.members=state.members.filter(x=>x.id!==id); state.expenses=state.expenses.map(e=>({...e, splitIds:e.splitIds.filter(s=>s!==id)})).filter(e=>e.payer!==id); renderExpense();}}; });
+ const payer=document.querySelector('[name="payer"]'); payer.innerHTML='<option value="">選擇付款人</option>'+state.members.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+ document.querySelector('[name="category"]').innerHTML=expenseCats.map(c=>`<option>${c}</option>`).join('');
+ document.getElementById('splitMembers').innerHTML=state.members.map(m=>`<label class="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"><input type="checkbox" value="${m.id}" checked> ${escapeHtml(m.name)}</label>`).join('');
+ document.getElementById('settlementTable').innerHTML=`<table class="min-w-full text-sm"><thead><tr class="text-left text-slate-500"><th class="py-2">成員</th><th>預付</th><th>墊付</th><th>應負擔</th><th>差額</th><th>狀態</th></tr></thead><tbody>${res.map(r=>`<tr class="border-t border-slate-100"><td class="py-2 font-semibold">${escapeHtml(r.name)}</td><td>${fmt(r.prepaid)}</td><td>${fmt(r.paid)}</td><td>${fmt(r.owe)}</td><td class="font-bold ${r.balance>=0?'text-teal-700':'text-red-600'}">${fmt(r.balance)}</td><td>${r.balance>0.5?'應收':r.balance<-0.5?'應付':'打平'}</td></tr>`).join('')}</tbody></table>`;
+ const ts=transfers(res); document.getElementById('transferList').innerHTML = ts.length? ts.map((t,i)=>`<div class="rounded-2xl bg-slate-50 p-4"><span class="font-bold">${i+1}. ${escapeHtml(t.from)} → ${escapeHtml(t.to)}</span><span class="ml-2 text-teal-700 font-bold">${fmt(t.amount)}</span></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">目前沒有需要轉帳的差額。</div>';
+ document.getElementById('expenseRecords').innerHTML = state.expenses.length? state.expenses.map(e=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p class="font-bold">${escapeHtml(e.date)}｜${escapeHtml(e.title)} <span class="text-teal-700">${fmt(e.amount)}</span></p><p class="mt-1 text-sm text-slate-600">${escapeHtml(e.category)}｜付款人：${escapeHtml(state.members.find(m=>m.id===e.payer)?.name||'未知')}｜分攤：${e.splitIds.map(id=>state.members.find(m=>m.id===id)?.name||'未知').join('、')}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml(e.note||'')}</p></div><button onclick="deleteExpense('${e.id}')" class="rounded-full bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600">刪除</button></div></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">尚無花費紀錄。</div>';
+ renderExpenseCharts(res);
+}
+function renderExpenseCharts(res){
+ const byCat={}; expenseCats.forEach(c=>byCat[c]=0); state.expenses.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+Number(e.amount||0));
+ if(categoryChart) categoryChart.destroy(); categoryChart=new Chart(document.getElementById('categoryExpenseChart'),{type:'doughnut', data:{labels:Object.keys(byCat), datasets:[{data:Object.values(byCat)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}});
+ if(memberChart) memberChart.destroy(); memberChart=new Chart(document.getElementById('memberExpenseChart'),{type:'bar', data:{labels:res.map(r=>r.name), datasets:[{label:'預付+墊付',data:res.map(r=>r.prepaid+r.paid)},{label:'應負擔',data:res.map(r=>r.owe)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}}}});
+}
+window.deleteExpense=(id)=>{ if(confirm('確定刪除此花費？')){ state.expenses=state.expenses.filter(e=>e.id!==id); renderExpense(); }};
+document.getElementById('addMemberBtn').onclick=()=>{state.members.push({id:crypto.randomUUID(), name:`成員${state.members.length+1}`, prepaid:0, received:false, note:''}); renderExpense();};
+document.getElementById('expenseForm').onsubmit=(e)=>{ e.preventDefault(); const fd=new FormData(e.target); const splitIds=[...document.querySelectorAll('#splitMembers input:checked')].map(x=>x.value); const amount=Number(fd.get('amount')); if(!amount||amount<=0) return toast('請輸入正確金額'); if(!fd.get('payer')) return toast('請選擇付款人'); if(!splitIds.length) return toast('至少選擇一位分攤人'); state.expenses.push({id:crypto.randomUUID(), date:fd.get('date'), title:fd.get('title'), amount, payer:fd.get('payer'), category:fd.get('category'), note:fd.get('note'), splitIds}); e.target.reset(); renderExpense(); toast('已新增花費'); };
+document.getElementById('clearExpensesBtn').onclick=()=>{ if(confirm('確定清除所有花費紀錄？')){ state.expenses=[]; renderExpense(); }};
+document.getElementById('clearAllBtn').onclick=()=>{ if(confirm('確定清除所有金流資料並恢復預設？')){ state=structuredClone(defaultState); renderExpense(); }};
+document.getElementById('exportBtn').onclick=()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='swiss-trip-expense.json'; a.click(); URL.revokeObjectURL(a.href); };
+document.getElementById('importFile').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const obj=JSON.parse(r.result); if(!obj.members || !obj.expenses) throw new Error(); state=obj; renderExpense(); toast('匯入完成'); }catch{ toast('匯入失敗：JSON 格式不正確'); } }; r.readAsText(f); };
+document.getElementById('copyLineBtn').onclick=async()=>{ const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc(); const ts=transfers(res); const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【每人結算】\n${res.map(r=>`${r.name}：${r.balance>0?'應收':r.balance<0?'應付':'打平'} ${fmt(Math.abs(r.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`; try{ await navigator.clipboard.writeText(txt); toast('已複製到剪貼簿'); }catch{ toast('複製失敗，請改用手動選取'); }};
+
+initTrip(); renderExpense();
+</script>
+</body>
+</html>
