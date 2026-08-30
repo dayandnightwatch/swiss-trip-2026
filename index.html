@@ -6,6 +6,7 @@
   <title>2026 趣瑞士｜歐洲旅行互動行程</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     html { scroll-behavior: smooth; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; }
@@ -142,7 +143,19 @@
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 class="text-2xl font-bold">金流分帳</h2>
-            <p class="mt-1 text-sm text-slate-500">資料儲存在目前瀏覽器 localStorage。若換手機或電腦，請使用 JSON 匯出 / 匯入。</p>
+            <p class="mt-1 text-sm text-slate-500">金流會同步到雲端，所有訪客都能查看目前狀況；只有管理者登入後可以修改。</p>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span id="cloudStatus" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">正在連線到雲端…</span>
+              <button id="adminLoginBtn" class="rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-700">管理者登入</button>
+              <button id="adminLogoutBtn" class="hidden rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">登出管理模式</button>
+            </div>
+            <div id="adminLoginBox" class="mt-3 hidden rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100">
+              <form id="adminLoginForm" class="flex flex-col gap-2 sm:flex-row">
+                <input id="adminEmail" type="email" required placeholder="管理者 email" class="min-w-0 flex-1 rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm">
+                <button class="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">寄送登入連結</button>
+              </form>
+              <p class="mt-2 text-xs text-teal-800">請使用已核准的管理者信箱；訪客不需要登入即可查看。</p>
+            </div>
           </div>
           <div class="flex flex-wrap gap-2">
             <button id="copyLineBtn" class="rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white">複製 LINE 結算</button>
@@ -368,16 +381,50 @@ function renderTransportChart(){
  new Chart(document.getElementById('transportChart'), {type:'doughnut', data:{labels:Object.keys(counts), datasets:[{data:Object.values(counts)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}});
 }
 
-// Expense module
+// Expense module with Supabase cloud storage and owner-only editing.
 const STORAGE_KEY='swiss_trip_expense_v1';
+const TRIP_ID='swiss-trip-2026';
+const SUPABASE_URL='https://frpulxjhrcfgbtfjodxf.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_CSK4uOj-1fOCNbiJhzdEBw_4whJcw4K';
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const defaultState={members:[
- {id:crypto.randomUUID(), name:'Wayne', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員A', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員B', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員C', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員D', prepaid:0, received:false, note:''}, {id:crypto.randomUUID(), name:'成員E', prepaid:0, received:false, note:''}
+ {id:'wayne', name:'Wayne', prepaid:0, received:false, note:''},
+ {id:'member-a', name:'成員A', prepaid:0, received:false, note:''},
+ {id:'member-b', name:'成員B', prepaid:0, received:false, note:''},
+ {id:'member-c', name:'成員C', prepaid:0, received:false, note:''},
+ {id:'member-d', name:'成員D', prepaid:0, received:false, note:''},
+ {id:'member-e', name:'成員E', prepaid:0, received:false, note:''}
 ], expenses:[]};
-let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultState;
-let categoryChart, memberChart;
+function normalizeState(raw){
+ const source=raw&&typeof raw==='object'?raw:{};
+ const members=Array.isArray(source.members)?source.members.map((m,i)=>({id:m.id||crypto.randomUUID(),name:String(m.name||`成員${i+1}`),prepaid:Number(m.prepaid)||0,received:Boolean(m.received),note:String(m.note||'')})):structuredClone(defaultState.members);
+ const expenses=Array.isArray(source.expenses)?source.expenses.map(e=>({...e,id:e.id||crypto.randomUUID(),date:String(e.date||''),title:String(e.title||''),amount:Number(e.amount)||0,payer:String(e.payer||''),category:String(e.category||'其他'),note:String(e.note||''),splitIds:Array.isArray(e.splitIds)?e.splitIds:[]})):[];
+ return {members:members.length?members:structuredClone(defaultState.members),expenses};
+}
+let state=normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'));
+let categoryChart,memberChart,cloudLoaded=false,isAdmin=false,cloudSaveTimer;
 const expenseCats=['住宿','餐費','交通','採買','門票','停車','其他'];
-function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function setCloudStatus(msg){ document.getElementById('cloudStatus').textContent=msg; }
+function saveLocal(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+async function saveCloudState(){
+ if(!isAdmin||!cloudLoaded) return;
+ const {error}=await supabaseClient.from('trip_expense_state').upsert({trip_id:TRIP_ID,state,updated_at:new Date().toISOString()},{onConflict:'trip_id'});
+ if(error){ console.error(error); setCloudStatus('雲端儲存失敗，資料仍保留在本機'); toast('雲端儲存失敗，請稍後再試'); }
+ else setCloudStatus('已同步至 Supabase');
+}
+function save(){
+ saveLocal();
+ if(isAdmin&&cloudLoaded){ clearTimeout(cloudSaveTimer); cloudSaveTimer=setTimeout(saveCloudState,300); }
+}
+function applyExpenseAccess(){
+ const locked=!isAdmin;
+ document.querySelectorAll('#membersBox input,#membersBox button,#expenseForm input,#expenseForm select,#expenseForm button,#splitMembers input,#expenseRecords button,#clearExpensesBtn,#clearAllBtn,#importFile').forEach(el=>el.disabled=locked);
+ document.getElementById('addMemberBtn').disabled=locked;
+ document.getElementById('adminLoginBtn').classList.toggle('hidden',isAdmin);
+ document.getElementById('adminLogoutBtn').classList.toggle('hidden',!isAdmin);
+ document.getElementById('adminLoginBox').classList.toggle('hidden',isAdmin);
+}
 function calc(){
  const res=state.members.map(m=>({id:m.id,name:m.name,prepaid:Number(m.prepaid)||0,received:m.received, paid:0, owe:0, balance:0}));
  const byId=Object.fromEntries(res.map(r=>[r.id,r]));
@@ -406,6 +453,7 @@ function renderExpense(){
  const ts=transfers(res); document.getElementById('transferList').innerHTML = ts.length? ts.map((t,i)=>`<div class="rounded-2xl bg-slate-50 p-4"><span class="font-bold">${i+1}. ${escapeHtml(t.from)} → ${escapeHtml(t.to)}</span><span class="ml-2 text-teal-700 font-bold">${fmt(t.amount)}</span></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">目前沒有需要轉帳的差額。</div>';
  document.getElementById('expenseRecords').innerHTML = state.expenses.length? state.expenses.map(e=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p class="font-bold">${escapeHtml(e.date)}｜${escapeHtml(e.title)} <span class="text-teal-700">${fmt(e.amount)}</span></p><p class="mt-1 text-sm text-slate-600">${escapeHtml(e.category)}｜付款人：${escapeHtml(state.members.find(m=>m.id===e.payer)?.name||'未知')}｜分攤：${e.splitIds.map(id=>state.members.find(m=>m.id===id)?.name||'未知').join('、')}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml(e.note||'')}</p></div><button onclick="deleteExpense('${e.id}')" class="rounded-full bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600">刪除</button></div></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">尚無花費紀錄。</div>';
  renderExpenseCharts(res);
+ applyExpenseAccess();
 }
 function renderExpenseCharts(res){
  const byCat={}; expenseCats.forEach(c=>byCat[c]=0); state.expenses.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+Number(e.amount||0));
@@ -421,7 +469,34 @@ document.getElementById('exportBtn').onclick=()=>{ const blob=new Blob([JSON.str
 document.getElementById('importFile').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const obj=JSON.parse(r.result); if(!obj.members || !obj.expenses) throw new Error(); state=obj; renderExpense(); toast('匯入完成'); }catch{ toast('匯入失敗：JSON 格式不正確'); } }; r.readAsText(f); };
 document.getElementById('copyLineBtn').onclick=async()=>{ const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc(); const ts=transfers(res); const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【每人結算】\n${res.map(r=>`${r.name}：${r.balance>0?'應收':r.balance<0?'應付':'打平'} ${fmt(Math.abs(r.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`; try{ await navigator.clipboard.writeText(txt); toast('已複製到剪貼簿'); }catch{ toast('複製失敗，請改用手動選取'); }};
 
-initTrip(); renderExpense();
+async function loadCloudState(){
+ const {data,error}=await supabaseClient.from('trip_expense_state').select('state').eq('trip_id',TRIP_ID).maybeSingle();
+ if(error){ console.error(error); setCloudStatus('雲端讀取失敗，暫時使用本機備份'); return; }
+ if(data?.state){ state=normalizeState(data.state); saveLocal(); }
+ cloudLoaded=true; setCloudStatus('已從 Supabase 載入'); renderExpense(); await refreshAuth();
+}
+async function refreshAuth(){
+ const {data:{session}}=await supabaseClient.auth.getSession(); isAdmin=false;
+ if(session?.user){
+   const {data:allowed,error}=await supabaseClient.rpc('is_trip_admin');
+   if(!error&&allowed){ isAdmin=true; setCloudStatus('管理模式：可編輯'); }
+   else { toast('此帳號沒有金流管理權限'); await supabaseClient.auth.signOut(); }
+ }
+ if(!isAdmin&&cloudLoaded) setCloudStatus('公開查看模式：所有人可查看，僅管理者可編輯');
+ renderExpense();
+}
+window.deleteExpense=(id)=>{ if(confirm('確定刪除此花費？')){ state.expenses=state.expenses.filter(e=>e.id!==id); renderExpense(); }};
+document.getElementById('addMemberBtn').onclick=()=>{state.members.push({id:crypto.randomUUID(),name:`成員${state.members.length+1}`,prepaid:0,received:false,note:''});renderExpense();};
+document.getElementById('expenseForm').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),splitIds=[...document.querySelectorAll('#splitMembers input:checked')].map(x=>x.value),amount=Number(fd.get('amount'));if(!amount||amount<=0)return toast('請輸入正確金額');if(!fd.get('payer'))return toast('請選擇付款人');if(!splitIds.length)return toast('至少選擇一位分攤人');state.expenses.push({id:crypto.randomUUID(),date:fd.get('date'),title:fd.get('title'),amount,payer:fd.get('payer'),category:fd.get('category'),note:fd.get('note'),splitIds});e.target.reset();renderExpense();toast('已新增花費');};
+document.getElementById('clearExpensesBtn').onclick=()=>{if(confirm('確定清除所有花費紀錄？')){state.expenses=[];renderExpense();}};
+document.getElementById('clearAllBtn').onclick=()=>{if(confirm('確定清除所有金流資料並恢復預設？')){state=structuredClone(defaultState);renderExpense();}};
+document.getElementById('importFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj.members||!obj.expenses)throw new Error();state=normalizeState(obj);renderExpense();toast('匯入完成');}catch{toast('匯入失敗：JSON 格式不正確');}};r.readAsText(f);};
+document.getElementById('adminLoginBtn').onclick=()=>document.getElementById('adminLoginBox').classList.toggle('hidden');
+document.getElementById('adminLoginForm').onsubmit=async e=>{e.preventDefault();const email=document.getElementById('adminEmail').value.trim();const {error}=await supabaseClient.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});if(error){console.error(error);toast('登入連結寄送失敗，請確認 email 或稍後再試');}else toast('登入連結已寄到信箱，請點擊信件完成登入');};
+document.getElementById('adminLogoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();toast('已登出管理模式');};
+supabaseClient.auth.onAuthStateChange(event=>{if(['SIGNED_IN','SIGNED_OUT','TOKEN_REFRESHED'].includes(event))setTimeout(refreshAuth,0);});
+
+initTrip(); renderExpense(); loadCloudState();
 </script>
 </body>
 </html>
