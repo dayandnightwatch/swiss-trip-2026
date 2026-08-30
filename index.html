@@ -441,6 +441,11 @@ function transfers(res){
  return out;
 }
 function renderExpense(){
+ const active=document.activeElement;
+ const activeMemberBox=active?.closest?.('[data-mid]');
+ const activeMemberId=activeMemberBox?.dataset.mid;
+ const activeMemberField=active?.classList?.contains('member-name')?'.member-name':active?.classList?.contains('member-prepaid')?'.member-prepaid':null;
+ const activeCaret=activeMemberField==='.member-name'?active.selectionStart:null;
  save();
  const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
  document.getElementById('summaryCards').innerHTML=[['總預付款',totalPrepaid],['已收到預付款',receivedPrepaid],['總實際花費',totalExpense],[(totalPrepaid-totalExpense)>=0?'目前剩餘':'目前不足',Math.abs(totalPrepaid-totalExpense)],['平均每人負擔',avg],['總筆數',state.expenses.length]].map(([k,v])=>`<div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p class="text-xs text-slate-500">${k}</p><p class="mt-1 text-xl font-bold">${typeof v==='number'?fmt(v):v}</p></div>`).join('');
@@ -454,6 +459,11 @@ function renderExpense(){
  document.getElementById('expenseRecords').innerHTML = state.expenses.length? state.expenses.map(e=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p class="font-bold">${escapeHtml(e.date)}｜${escapeHtml(e.title)} <span class="text-teal-700">${fmt(e.amount)}</span></p><p class="mt-1 text-sm text-slate-600">${escapeHtml(e.category)}｜付款人：${escapeHtml(state.members.find(m=>m.id===e.payer)?.name||'未知')}｜分攤：${e.splitIds.map(id=>state.members.find(m=>m.id===id)?.name||'未知').join('、')}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml(e.note||'')}</p></div><button onclick="deleteExpense('${e.id}')" class="rounded-full bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600">刪除</button></div></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">尚無花費紀錄。</div>';
  renderExpenseCharts(res);
  applyExpenseAccess();
+ if(activeMemberId&&activeMemberField){
+   const nextBox=[...document.querySelectorAll('[data-mid]')].find(box=>box.dataset.mid===activeMemberId);
+   const next=nextBox?.querySelector(activeMemberField);
+   if(next){ next.focus(); if(activeMemberField==='.member-name'&&Number.isInteger(activeCaret)){ const caret=Math.min(activeCaret,next.value.length); next.setSelectionRange(caret,caret); } }
+ }
 }
 function renderExpenseCharts(res){
  const byCat={}; expenseCats.forEach(c=>byCat[c]=0); state.expenses.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+Number(e.amount||0));
