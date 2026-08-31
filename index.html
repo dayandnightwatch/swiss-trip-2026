@@ -145,9 +145,10 @@
             <h2 class="text-2xl font-bold">金流分帳</h2>
             <p class="mt-1 text-sm text-slate-500">金流會同步到雲端，所有訪客都能查看目前狀況；只有管理者登入後可以修改。</p>
             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span id="cloudStatus" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">正在連線到雲端…</span>
-              <button id="adminLoginBtn" class="rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-700">管理者登入</button>
-              <button id="adminLogoutBtn" class="hidden rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">登出管理模式</button>
+               <span id="cloudStatus" class="rounded-full bg-slate-100 px-3 py-1 text-slate-600">正在連線到雲端…</span>
+               <button id="adminLoginBtn" class="rounded-full bg-teal-50 px-3 py-1 font-semibold text-teal-700">管理者登入</button>
+               <button id="adminLogoutBtn" class="hidden rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">登出管理模式</button>
+               <button id="clearLocalTestBtn" class="hidden rounded-full bg-orange-50 px-3 py-1 font-semibold text-orange-700">清除本機測試資料</button>
             </div>
             <div id="adminLoginBox" class="mt-3 hidden rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-100">
               <form id="adminLoginForm" class="flex flex-col gap-2 sm:flex-row">
@@ -174,8 +175,18 @@
             <h3 class="text-lg font-bold">成員與預付款</h3>
             <button id="addMemberBtn" class="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-700">新增成員</button>
           </div>
-          <div id="membersBox" class="mt-4 space-y-3"></div>
-        </div>
+           <div id="membersBox" class="mt-4 space-y-3"></div>
+           <div class="mt-6 border-t border-slate-200 pt-5">
+             <div class="flex items-center justify-between gap-3">
+               <div>
+                 <h4 class="font-bold">結算群組</h4>
+                 <p class="mt-1 text-xs text-slate-500">群組內部差額會互相抵銷，跨群組轉帳仍會保留。</p>
+               </div>
+               <button id="addGroupBtn" class="shrink-0 rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-700">新增群組</button>
+             </div>
+             <div id="groupsBox" class="mt-4 space-y-3"></div>
+           </div>
+         </div>
 
         <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:col-span-3">
           <h3 class="text-lg font-bold">新增花費</h3>
@@ -384,33 +395,43 @@ function renderTransportChart(){
 
 // Expense module with Supabase cloud storage and owner-only editing.
 const STORAGE_KEY='swiss_trip_expense_v1';
+const LOCAL_TEST_MODE=new URLSearchParams(location.search).get('localTest')==='1';
+const ACTIVE_STORAGE_KEY=LOCAL_TEST_MODE?'swiss_trip_expense_local_test_v1':STORAGE_KEY;
 const TRIP_ID='swiss-trip-2026';
 const FIXED_ADMIN_EMAIL='mthsieh86@gmail.com';
 const SUPABASE_URL='https://frpulxjhrcfgbtfjodxf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_CSK4uOj-1fOCNbiJhzdEBw_4whJcw4K';
 const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const defaultState={members:[
- {id:'wayne', name:'Wayne', prepaid:0, received:false, note:''},
- {id:'member-a', name:'成員A', prepaid:0, received:false, note:''},
- {id:'member-b', name:'成員B', prepaid:0, received:false, note:''},
- {id:'member-c', name:'成員C', prepaid:0, received:false, note:''},
- {id:'member-d', name:'成員D', prepaid:0, received:false, note:''},
- {id:'member-e', name:'成員E', prepaid:0, received:false, note:''}
-], expenses:[]};
+  {id:'wayne', name:'Wayne', prepaid:0, received:false, note:''},
+  {id:'member-a', name:'成員A', prepaid:0, received:false, note:''},
+  {id:'member-b', name:'成員B', prepaid:0, received:false, note:''},
+  {id:'member-c', name:'成員C', prepaid:0, received:false, note:''},
+  {id:'member-d', name:'成員D', prepaid:0, received:false, note:''},
+  {id:'member-e', name:'成員E', prepaid:0, received:false, note:''}
+ ], groups:[], expenses:[]};
 function normalizeState(raw){
  const source=raw&&typeof raw==='object'?raw:{};
  const members=Array.isArray(source.members)?source.members.map((m,i)=>({id:m.id||crypto.randomUUID(),name:String(m.name||`成員${i+1}`),prepaid:Number(m.prepaid)||0,received:Boolean(m.received),note:String(m.note||'')})):structuredClone(defaultState.members);
  const expenses=Array.isArray(source.expenses)?source.expenses.map(e=>({...e,id:e.id||crypto.randomUUID(),date:String(e.date||''),title:String(e.title||''),amount:Number(e.amount)||0,payer:String(e.payer||''),category:String(e.category||'其他'),note:String(e.note||''),splitIds:Array.isArray(e.splitIds)?e.splitIds:[]})):[];
- return {members:members.length?members:structuredClone(defaultState.members),expenses};
+ const memberIds=new Set(members.map(m=>m.id));
+ const assigned=new Set();
+ const groups=Array.isArray(source.groups)?source.groups.map((g,i)=>{
+  const memberIdsInGroup=[...(Array.isArray(g.memberIds)?g.memberIds:[])].filter(id=>memberIds.has(id)&&!assigned.has(id));
+  memberIdsInGroup.forEach(id=>assigned.add(id));
+  const representativeId=memberIdsInGroup.includes(g.representativeId)?g.representativeId:(memberIdsInGroup[0]||'');
+  return {id:g.id||crypto.randomUUID(),name:String(g.name||`群組${i+1}`),memberIds:memberIdsInGroup,representativeId};
+ }):[];
+ return {members:members.length?members:structuredClone(defaultState.members),groups,expenses};
 }
-let state=normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'));
-let categoryChart,memberChart,cloudLoaded=false,isAdmin=false,cloudSaveTimer,suppressCloudSave=false,cloudSubscription;
+let state=normalizeState(JSON.parse(localStorage.getItem(ACTIVE_STORAGE_KEY)||'null'));
+let categoryChart,memberChart,cloudLoaded=LOCAL_TEST_MODE,isAdmin=LOCAL_TEST_MODE,cloudSaveTimer,suppressCloudSave=false,cloudSubscription;
 const expenseCats=['住宿','餐費','交通','採買','門票','停車','其他'];
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 function setCloudStatus(msg){ document.getElementById('cloudStatus').textContent=msg; }
-function saveLocal(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+function saveLocal(){ localStorage.setItem(ACTIVE_STORAGE_KEY,JSON.stringify(state)); }
 async function saveCloudState(){
- if(!isAdmin||!cloudLoaded) return;
+ if(LOCAL_TEST_MODE||!isAdmin||!cloudLoaded) return;
  const {error}=await supabaseClient.from('trip_expense_state').upsert({trip_id:TRIP_ID,state,updated_at:new Date().toISOString()},{onConflict:'trip_id'});
  if(error){ console.error(error); setCloudStatus('雲端儲存失敗，資料仍保留在本機'); toast('雲端儲存失敗，請稍後再試'); }
  else setCloudStatus('已同步至 Supabase');
@@ -425,11 +446,13 @@ async function saveCloudState(){
 }
 function applyExpenseAccess(){
  const locked=!isAdmin;
- document.querySelectorAll('#membersBox input,#membersBox button,#expenseForm input,#expenseForm select,#expenseForm button,#splitMembers input,#expenseRecords button,#clearExpensesBtn,#clearAllBtn,#importFile').forEach(el=>el.disabled=locked);
+ document.querySelectorAll('#membersBox input,#membersBox button,#groupsBox input,#groupsBox select,#groupsBox button,#expenseForm input,#expenseForm select,#expenseForm button,#splitMembers input,#expenseRecords button,#clearExpensesBtn,#clearAllBtn,#importFile').forEach(el=>el.disabled=locked);
  document.getElementById('addMemberBtn').disabled=locked;
- document.getElementById('adminLoginBtn').classList.toggle('hidden',isAdmin);
- document.getElementById('adminLogoutBtn').classList.toggle('hidden',!isAdmin);
- document.getElementById('adminLoginBox').classList.toggle('hidden',isAdmin);
+ document.getElementById('addGroupBtn').disabled=locked;
+ document.getElementById('adminLoginBtn').classList.toggle('hidden',isAdmin||LOCAL_TEST_MODE);
+ document.getElementById('adminLogoutBtn').classList.toggle('hidden',!isAdmin||LOCAL_TEST_MODE);
+ document.getElementById('adminLoginBox').classList.toggle('hidden',isAdmin||LOCAL_TEST_MODE);
+ document.getElementById('clearLocalTestBtn').classList.toggle('hidden',!LOCAL_TEST_MODE);
 }
 function calc(){
  const res=state.members.map(m=>({id:m.id,name:m.name,prepaid:Number(m.prepaid)||0,received:m.received, paid:0, owe:0, balance:0}));
@@ -439,9 +462,40 @@ function calc(){
  const totalExpense=state.expenses.reduce((s,e)=>s+Number(e.amount||0),0), totalPrepaid=res.reduce((s,r)=>s+r.prepaid,0), receivedPrepaid=res.filter(r=>r.received).reduce((s,r)=>s+r.prepaid,0);
  return {res,totalExpense,totalPrepaid,receivedPrepaid,avg: state.members.length?totalExpense/state.members.length:0};
 }
+function settlementParties(res){
+ const byId=Object.fromEntries(res.map(r=>[r.id,r]));
+ const groupedMembers=new Set();
+ const debtors=[];
+ const creditors=[];
+ state.groups.forEach(group=>{
+  const members=(group.memberIds||[]).map(id=>byId[id]).filter(Boolean);
+  if(!members.length) return;
+  members.forEach(member=>groupedMembers.add(member.id));
+  const groupBalance=members.reduce((sum,member)=>sum+member.balance,0);
+  if(groupBalance>0.5){
+   const representative=byId[group.representativeId]||members[0];
+   creditors.push({name:representative.name,amount:groupBalance});
+   return;
+  }
+  if(groupBalance>=-0.5) return;
+  let internalCredit=members.filter(member=>member.balance>0.5).reduce((sum,member)=>sum+member.balance,0);
+  members.filter(member=>member.balance<-0.5).forEach(member=>{
+   const offset=Math.min(-member.balance,internalCredit);
+   internalCredit-=offset;
+   const remaining=-member.balance-offset;
+   if(remaining>0.5) debtors.push({name:member.name,amount:remaining});
+  });
+ });
+ res.filter(member=>!groupedMembers.has(member.id)).forEach(member=>{
+  if(member.balance<-0.5) debtors.push({name:member.name,amount:-member.balance});
+  if(member.balance>0.5) creditors.push({name:member.name,amount:member.balance});
+ });
+ return {debtors,creditors};
+}
 function transfers(res){
- const debtors=res.filter(r=>r.balance < -0.5).map(r=>({name:r.name, amount:Math.round(-r.balance)}));
- const creditors=res.filter(r=>r.balance > 0.5).map(r=>({name:r.name, amount:Math.round(r.balance)}));
+ const parties=settlementParties(res);
+ const debtors=parties.debtors.map(r=>({name:r.name,amount:Math.round(r.amount)})).filter(r=>r.amount>0);
+ const creditors=parties.creditors.map(r=>({name:r.name,amount:Math.round(r.amount)})).filter(r=>r.amount>0);
  const out=[]; let i=0,j=0;
  while(i<debtors.length && j<creditors.length){ const amt=Math.min(debtors[i].amount, creditors[j].amount); if(amt>0) out.push({from:debtors[i].name,to:creditors[j].name,amount:amt}); debtors[i].amount-=amt; creditors[j].amount-=amt; if(debtors[i].amount===0)i++; if(creditors[j].amount===0)j++; }
  return out;
@@ -456,8 +510,9 @@ function renderExpense(){
  const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
  document.getElementById('summaryCards').innerHTML=[['總預付款',totalPrepaid],['已收到預付款',receivedPrepaid],['總實際花費',totalExpense],[(totalPrepaid-totalExpense)>=0?'目前剩餘':'目前不足',Math.abs(totalPrepaid-totalExpense)],['平均每人負擔',avg],['總筆數',state.expenses.length]].map(([k,v])=>`<div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p class="text-xs text-slate-500">${k}</p><p class="mt-1 text-xl font-bold">${typeof v==='number'?fmt(v):v}</p></div>`).join('');
  document.getElementById('membersBox').innerHTML=state.members.map(m=>`<div class="rounded-2xl bg-slate-50 p-3" data-mid="${m.id}"><div class="grid gap-2 md:grid-cols-2"><input class="member-name rounded-xl border border-slate-200 px-3 py-2" value="${escapeHtml(m.name)}"><input class="member-prepaid rounded-xl border border-slate-200 px-3 py-2" type="number" min="0" value="${m.prepaid}"><label class="flex items-center gap-2 text-sm"><input class="member-received h-4 w-4" type="checkbox" ${m.received?'checked':''}>已收到預付款</label><input class="member-note rounded-xl border border-slate-200 px-3 py-2" placeholder="備註" value="${escapeHtml(m.note||'')}"></div><button class="delete-member mt-2 text-sm font-semibold text-red-600">刪除</button></div>`).join('');
- document.querySelectorAll('[data-mid]').forEach(box=>{ const id=box.dataset.mid, m=state.members.find(x=>x.id===id); const nameInput=box.querySelector('.member-name'); nameInput.oninput=e=>{m.name=e.target.value;saveLocal();if(!e.isComposing)renderExpense();}; nameInput.oncompositionend=e=>{m.name=e.target.value;renderExpense();saveCloudState();}; nameInput.onchange=()=>saveCloudState(); box.querySelector('.member-prepaid').oninput=e=>{m.prepaid=Number(e.target.value)||0;renderExpense();}; box.querySelector('.member-prepaid').onchange=()=>saveCloudState(); box.querySelector('.member-received').onchange=e=>{m.received=e.target.checked;renderExpense();saveCloudState();}; box.querySelector('.member-note').oninput=e=>{m.note=e.target.value;save();}; box.querySelector('.member-note').onchange=()=>saveCloudState(); box.querySelector('.delete-member').onclick=()=>{ if(state.members.length<=1) return toast('至少需保留一位成員'); if(confirm('確定刪除此成員？相關花費紀錄不會自動刪除。')) {state.members=state.members.filter(x=>x.id!==id); state.expenses=state.expenses.map(e=>({...e, splitIds:e.splitIds.filter(s=>s!==id)})).filter(e=>e.payer!==id); renderExpense();saveCloudState();}}; });
- const payer=document.querySelector('[name="payer"]'); payer.innerHTML='<option value="">選擇付款人</option>'+state.members.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  document.querySelectorAll('[data-mid]').forEach(box=>{ const id=box.dataset.mid, m=state.members.find(x=>x.id===id); const nameInput=box.querySelector('.member-name'); nameInput.oninput=e=>{m.name=e.target.value;saveLocal();if(!e.isComposing)renderExpense();}; nameInput.oncompositionend=e=>{m.name=e.target.value;renderExpense();saveCloudState();}; nameInput.onchange=()=>saveCloudState(); box.querySelector('.member-prepaid').oninput=e=>{m.prepaid=Number(e.target.value)||0;renderExpense();}; box.querySelector('.member-prepaid').onchange=()=>saveCloudState(); box.querySelector('.member-received').onchange=e=>{m.received=e.target.checked;renderExpense();saveCloudState();}; box.querySelector('.member-note').oninput=e=>{m.note=e.target.value;save();}; box.querySelector('.member-note').onchange=()=>saveCloudState(); box.querySelector('.delete-member').onclick=()=>{ if(state.members.length<=1) return toast('至少需保留一位成員'); if(confirm('確定刪除此成員？相關花費紀錄不會自動刪除。')) {state.members=state.members.filter(x=>x.id!==id); state.groups=state.groups.map(group=>{const memberIds=group.memberIds.filter(memberId=>memberId!==id);return {...group,memberIds,representativeId:group.representativeId===id?(memberIds[0]||''):group.representativeId};}); state.expenses=state.expenses.map(e=>({...e, splitIds:e.splitIds.filter(s=>s!==id)})).filter(e=>e.payer!==id); renderExpense();save({immediate:true});toast('已刪除成員');}}; });
+  renderGroups();
+  const payer=document.querySelector('[name="payer"]'); payer.innerHTML='<option value="">選擇付款人</option>'+state.members.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
  document.querySelector('[name="category"]').innerHTML=expenseCats.map(c=>`<option>${c}</option>`).join('');
  document.getElementById('splitMembers').innerHTML=state.members.map(m=>`<label class="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"><input type="checkbox" value="${m.id}" checked> ${escapeHtml(m.name)}</label>`).join('');
  document.getElementById('settlementTable').innerHTML=`<table class="min-w-full text-sm"><thead><tr class="text-left text-slate-500"><th class="py-2">成員</th><th>預付</th><th>墊付</th><th>應負擔</th><th>差額</th><th>狀態</th></tr></thead><tbody>${res.map(r=>`<tr class="border-t border-slate-100"><td class="py-2 font-semibold">${escapeHtml(r.name)}</td><td>${fmt(r.prepaid)}</td><td>${fmt(r.paid)}</td><td>${fmt(r.owe)}</td><td class="font-bold ${r.balance>=0?'text-teal-700':'text-red-600'}">${fmt(r.balance)}</td><td>${r.balance>0.5?'應收':r.balance<-0.5?'應付':'打平'}</td></tr>`).join('')}</tbody></table>`;
@@ -476,9 +531,82 @@ function renderExpenseCharts(res){
  if(categoryChart) categoryChart.destroy(); categoryChart=new Chart(document.getElementById('categoryExpenseChart'),{type:'doughnut', data:{labels:Object.keys(byCat), datasets:[{data:Object.values(byCat)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}});
  if(memberChart) memberChart.destroy(); memberChart=new Chart(document.getElementById('memberExpenseChart'),{type:'bar', data:{labels:res.map(r=>r.name), datasets:[{label:'預付+墊付',data:res.map(r=>r.prepaid+r.paid)},{label:'應負擔',data:res.map(r=>r.owe)}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{y:{beginAtZero:true}}}});
 }
- function applyCloudState(cloudState,status='已同步最新雲端資料'){
+let openGroupId=null;
+let groupDraft=null;
+function cloneGroup(group){
+ return {id:group.id,name:group.name,memberIds:[...(group.memberIds||[])],representativeId:group.representativeId||''};
+}
+function groupMemberLabels(memberIds){
+ const names=(memberIds||[]).map(id=>state.members.find(member=>member.id===id)?.name).filter(Boolean);
+ return names.length?names.map(name=>`<span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">${escapeHtml(name)}</span>`).join(''):'<span class="text-xs text-slate-400">尚未設定成員</span>';
+}
+function renderGroupEditor(draft,title){
+ const memberIds=new Set(draft.memberIds||[]);
+ const memberOptions=state.members.map(member=>{
+  const owner=state.groups.find(other=>other.id!==draft.id&&(other.memberIds||[]).includes(member.id));
+  const disabled=owner?'disabled':'';
+  return `<label class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-slate-200"><input class="group-member h-4 w-4" type="checkbox" value="${member.id}" ${memberIds.has(member.id)?'checked':''} ${disabled}>${escapeHtml(member.name)}${owner?`<span class="ml-auto text-xs text-slate-400">已在${escapeHtml(owner.name)}</span>`:''}</label>`;
+ }).join('');
+ const representativeOptions='<option value="">選擇代表人</option>'+(draft.memberIds||[]).map(id=>{const member=state.members.find(item=>item.id===id);return member?`<option value="${member.id}" ${draft.representativeId===member.id?'selected':''}>${escapeHtml(member.name)}</option>`:'';}).join('');
+ return `<div class="rounded-2xl bg-white p-3 ring-1 ring-teal-200" data-group-editor-id="${draft.id}"><p class="text-sm font-bold text-teal-800">${title}</p><div class="mt-3 grid gap-2 sm:grid-cols-2"><input class="group-draft-name rounded-xl border border-slate-200 px-3 py-2" value="${escapeHtml(draft.name)}" placeholder="群組名稱"><select class="group-draft-representative rounded-xl border border-slate-200 px-3 py-2" ${draft.memberIds.length?'':'disabled'}>${representativeOptions}</select></div><p class="mt-3 text-xs text-slate-500">請選擇群組成員。已加入其他群組的成員會暫時鎖定。</p><div class="mt-2 grid gap-2 sm:grid-cols-2">${memberOptions}</div><div class="mt-3 flex flex-wrap gap-2"><button class="save-group rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white">儲存群組</button><button class="cancel-group rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">取消</button></div></div>`;
+}
+function renderGroups(){
+ const box=document.getElementById('groupsBox');
+ const draftIsNew=groupDraft&&!state.groups.some(group=>group.id===groupDraft.id);
+ const newEditor=draftIsNew&&openGroupId===groupDraft.id?`<div class="rounded-2xl bg-slate-50 p-3">${renderGroupEditor(groupDraft,'新增群組設定')}</div>`:'';
+ const savedGroups=state.groups.map((group,index)=>{
+  const editing=groupDraft&&openGroupId===group.id&&groupDraft.id===group.id;
+  return `<div class="rounded-2xl bg-slate-50 p-3" data-group-id="${group.id}">${editing?renderGroupEditor(groupDraft,`編輯群組 ${index+1}`):`<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div class="min-w-0"><p class="font-semibold text-slate-800">${escapeHtml(group.name)}</p><div class="mt-2 flex flex-wrap gap-1.5">${groupMemberLabels(group.memberIds)}</div></div><div class="flex shrink-0 gap-2"><button class="edit-group rounded-full bg-white px-3 py-2 text-sm font-semibold text-teal-700 ring-1 ring-slate-200">設定</button><button class="delete-group rounded-full bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">刪除</button></div></div>`}</div>`;
+ }).join('');
+ box.innerHTML=newEditor+savedGroups||'<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">尚未設定結算群組，所有成員會個別結算。</div>';
+ box.querySelectorAll('.edit-group').forEach(button=>button.onclick=()=>{
+  const group=state.groups.find(item=>item.id===button.closest('[data-group-id]').dataset.groupId);
+  if(groupDraft){toast('請先儲存或取消目前的群組設定');return;}
+  groupDraft=cloneGroup(group);openGroupId=group.id;renderGroups();
+ });
+ box.querySelectorAll('.delete-group').forEach(button=>button.onclick=()=>{
+  const card=button.closest('[data-group-id]');
+  if(!card||!confirm('確定刪除此群組？只會解除群組關係，不會刪除成員或花費紀錄。')) return;
+  state.groups=state.groups.filter(group=>group.id!==card.dataset.groupId);
+  groupDraft=null;openGroupId=null;renderExpense();save({immediate:true});toast('已刪除群組');
+ });
+ const editor=box.querySelector('[data-group-editor-id]');
+ if(!editor||!groupDraft) return;
+ const draft=groupDraft;
+ editor.querySelector('.group-draft-name').oninput=e=>{draft.name=e.target.value;};
+ editor.querySelector('.group-draft-representative').onchange=e=>{draft.representativeId=e.target.value;};
+ editor.querySelectorAll('.group-member').forEach(input=>input.onchange=e=>{
+  const memberId=e.target.value;
+  const owner=state.groups.find(other=>other.id!==draft.id&&(other.memberIds||[]).includes(memberId));
+  if(e.target.checked){
+   if(owner){e.target.checked=false;toast('此成員已加入其他群組，請先移出原群組');return;}
+   if(!draft.memberIds.includes(memberId)) draft.memberIds.push(memberId);
+   if(!draft.representativeId) draft.representativeId=memberId;
+  }else{
+   draft.memberIds=draft.memberIds.filter(id=>id!==memberId);
+   if(draft.representativeId===memberId) draft.representativeId=draft.memberIds[0]||'';
+  }
+  renderGroups();
+ });
+ editor.querySelector('.save-group').onclick=()=>{
+  draft.name=draft.name.trim();
+  if(!draft.name) return toast('群組名稱不可空白');
+  if(!draft.memberIds.length) return toast('至少選擇一位群組成員');
+  if(!draft.representativeId||!draft.memberIds.includes(draft.representativeId)) return toast('請選擇群組代表人');
+  const conflict=state.groups.some(group=>group.id!==draft.id&&(group.memberIds||[]).some(id=>draft.memberIds.includes(id)));
+  if(conflict) return toast('同一成員不可同時加入不同群組');
+  const savedGroup=cloneGroup(draft);
+  const existingIndex=state.groups.findIndex(group=>group.id===draft.id);
+  if(existingIndex>=0) state.groups[existingIndex]=savedGroup; else state.groups.push(savedGroup);
+  groupDraft=null;openGroupId=null;renderExpense();save({immediate:true});toast('群組設定已儲存');
+ };
+ editor.querySelector('.cancel-group').onclick=()=>{groupDraft=null;openGroupId=null;renderGroups();};
+}
+function applyCloudState(cloudState,status='已同步最新雲端資料'){
  if(!cloudState) return;
  suppressCloudSave=true;
+ groupDraft=null;
+ openGroupId=null;
  state=normalizeState(cloudState);
  saveLocal();
  renderExpense();
@@ -486,6 +614,7 @@ function renderExpenseCharts(res){
  setCloudStatus(status);
 }
 async function loadCloudState(refreshLogin=true){
+ if(LOCAL_TEST_MODE){setCloudStatus('本機測試模式：只保存本機，不同步 Supabase');return;}
  const {data,error}=await supabaseClient.from('trip_expense_state').select('state').eq('trip_id',TRIP_ID).maybeSingle();
  if(error){ console.error(error); setCloudStatus('雲端讀取失敗，暫時使用本機備份'); return; }
  if(data?.state) applyCloudState(data.state,'已從 Supabase 載入');
@@ -494,7 +623,7 @@ async function loadCloudState(refreshLogin=true){
  if(refreshLogin) await refreshAuth();
 }
 function subscribeCloudState(){
- if(cloudSubscription) return;
+ if(LOCAL_TEST_MODE||cloudSubscription) return;
  cloudSubscription=supabaseClient.channel(`expense-${TRIP_ID}`)
   .on('postgres_changes',{event:'*',schema:'public',table:'trip_expense_state',filter:`trip_id=eq.${TRIP_ID}`},payload=>{
     if(payload.new?.state) applyCloudState(payload.new.state);
@@ -502,6 +631,7 @@ function subscribeCloudState(){
   .subscribe();
 }
 async function refreshAuth(){
+ if(LOCAL_TEST_MODE){isAdmin=true;cloudLoaded=true;setCloudStatus('本機測試模式：只保存本機，不同步 Supabase');renderExpense();return;}
  const {data:{session}}=await supabaseClient.auth.getSession(); isAdmin=false;
  if(session?.user){
    const {data:allowed,error}=await supabaseClient.rpc('is_trip_admin');
@@ -578,21 +708,45 @@ async function refreshAuth(){
   };
   r.readAsText(f);
  };
- document.getElementById('copyLineBtn').onclick=async()=>{
+  document.getElementById('copyLineBtn').onclick=async()=>{
   const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
   const ts=transfers(res);
   const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【每人結算】\n${res.map(r=>`${r.name}：${r.balance>0?'應收':r.balance<0?'應付':'打平'} ${fmt(Math.abs(r.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`;
   try{ await navigator.clipboard.writeText(txt); toast('已複製到剪貼簿'); }
   catch{ toast('複製失敗，請改用手動選取'); }
+  };
+ document.getElementById('addGroupBtn').onclick=()=>{
+  if(groupDraft){toast('請先儲存或取消目前的群組設定');return;}
+  groupDraft={id:crypto.randomUUID(),name:'',memberIds:[],representativeId:''};
+  openGroupId=groupDraft.id;
+  renderGroups();
  };
-document.getElementById('adminLoginBtn').onclick=()=>document.getElementById('adminLoginBox').classList.toggle('hidden');
+ document.getElementById('clearLocalTestBtn').onclick=()=>{
+  if(!LOCAL_TEST_MODE) return;
+  if(!confirm('確定清除所有本機測試資料並恢復預設？')) return;
+  localStorage.removeItem(ACTIVE_STORAGE_KEY);
+  state=structuredClone(defaultState);
+  groupDraft=null;openGroupId=null;renderExpense();
+  toast('已清除本機測試資料');
+ };
+ document.getElementById('adminLoginBtn').onclick=()=>document.getElementById('adminLoginBox').classList.toggle('hidden');
 document.getElementById('adminLoginForm').onsubmit=async e=>{e.preventDefault();const email=FIXED_ADMIN_EMAIL,password=document.getElementById('adminPassword').value;const {error}=await supabaseClient.auth.signInWithPassword({email,password});if(error){console.error(error);toast('帳號或密碼不正確');}else{document.getElementById('adminPassword').value='';toast('已登入管理模式');}};
 document.getElementById('adminLogoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();toast('已登出管理模式');};
-supabaseClient.auth.onAuthStateChange(event=>{if(['SIGNED_IN','SIGNED_OUT','TOKEN_REFRESHED'].includes(event))setTimeout(refreshAuth,0);});
-window.addEventListener('focus',()=>{if(cloudLoaded)loadCloudState(false);});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudLoaded)loadCloudState(false);});
+ if(!LOCAL_TEST_MODE){
+  supabaseClient.auth.onAuthStateChange(event=>{if(['SIGNED_IN','SIGNED_OUT','TOKEN_REFRESHED'].includes(event))setTimeout(refreshAuth,0);});
+  window.addEventListener('focus',()=>{if(cloudLoaded)loadCloudState(false);});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudLoaded)loadCloudState(false);});
+ }
 
-initTrip(); renderExpense(); subscribeCloudState(); loadCloudState();
+ initTrip();
+ if(LOCAL_TEST_MODE){
+  setCloudStatus('本機測試模式：只保存本機，不同步 Supabase');
+  renderExpense();
+ }else{
+  renderExpense();
+  subscribeCloudState();
+  loadCloudState();
+ }
 </script>
 </body>
 </html>
