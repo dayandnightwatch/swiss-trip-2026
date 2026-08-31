@@ -500,6 +500,19 @@ function transfers(res){
  while(i<debtors.length && j<creditors.length){ const amt=Math.min(debtors[i].amount, creditors[j].amount); if(amt>0) out.push({from:debtors[i].name,to:creditors[j].name,amount:amt}); debtors[i].amount-=amt; creditors[j].amount-=amt; if(debtors[i].amount===0)i++; if(creditors[j].amount===0)j++; }
  return out;
 }
+function settlementRows(res){
+ const byId=Object.fromEntries(res.map(r=>[r.id,r]));
+ const grouped=new Set();
+ const rows=[];
+ state.groups.forEach(group=>{
+  const members=(group.memberIds||[]).map(id=>byId[id]).filter(Boolean);
+  if(!members.length) return;
+  members.forEach(member=>grouped.add(member.id));
+  rows.push({name:group.name,memberNames:members.map(member=>member.name).join('、'),prepaid:members.reduce((sum,member)=>sum+member.prepaid,0),paid:members.reduce((sum,member)=>sum+member.paid,0),owe:members.reduce((sum,member)=>sum+member.owe,0),balance:members.reduce((sum,member)=>sum+member.balance,0)});
+ });
+ res.filter(member=>!grouped.has(member.id)).forEach(member=>rows.push({name:member.name,memberNames:'未分組',prepaid:member.prepaid,paid:member.paid,owe:member.owe,balance:member.balance}));
+ return rows;
+}
 function renderExpense(){
  const active=document.activeElement;
  const activeMemberBox=active?.closest?.('[data-mid]');
@@ -515,7 +528,7 @@ function renderExpense(){
   const payer=document.querySelector('[name="payer"]'); payer.innerHTML='<option value="">選擇付款人</option>'+state.members.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
  document.querySelector('[name="category"]').innerHTML=expenseCats.map(c=>`<option>${c}</option>`).join('');
  document.getElementById('splitMembers').innerHTML=state.members.map(m=>`<label class="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"><input type="checkbox" value="${m.id}" checked> ${escapeHtml(m.name)}</label>`).join('');
- document.getElementById('settlementTable').innerHTML=`<table class="min-w-full text-sm"><thead><tr class="text-left text-slate-500"><th class="py-2">成員</th><th>預付</th><th>墊付</th><th>應負擔</th><th>差額</th><th>狀態</th></tr></thead><tbody>${res.map(r=>`<tr class="border-t border-slate-100"><td class="py-2 font-semibold">${escapeHtml(r.name)}</td><td>${fmt(r.prepaid)}</td><td>${fmt(r.paid)}</td><td>${fmt(r.owe)}</td><td class="font-bold ${r.balance>=0?'text-teal-700':'text-red-600'}">${fmt(r.balance)}</td><td>${r.balance>0.5?'應收':r.balance<-0.5?'應付':'打平'}</td></tr>`).join('')}</tbody></table>`;
+ const settlementRowsData=settlementRows(res); document.getElementById('settlementTable').innerHTML=`<table class="min-w-full text-sm"><thead><tr class="text-left text-slate-500"><th class="py-2">結算單位</th><th>成員</th><th>預付</th><th>先付款</th><th>應負擔</th><th>差額</th><th>狀態</th></tr></thead><tbody>${settlementRowsData.map(row=>`<tr class="border-t border-slate-100"><td class="py-2 font-semibold">${escapeHtml(row.name)}</td><td class="text-slate-600">${escapeHtml(row.memberNames)}</td><td>${fmt(row.prepaid)}</td><td>${fmt(row.paid)}</td><td>${fmt(row.owe)}</td><td class="font-bold ${row.balance>=0?'text-teal-700':'text-red-600'}">${fmt(row.balance)}</td><td>${row.balance>0.5?'應收':row.balance<-0.5?'應付':'打平'}</td></tr>`).join('')}</tbody></table>`;
  const ts=transfers(res); document.getElementById('transferList').innerHTML = ts.length? ts.map((t,i)=>`<div class="rounded-2xl bg-slate-50 p-4"><span class="font-bold">${i+1}. ${escapeHtml(t.from)} → ${escapeHtml(t.to)}</span><span class="ml-2 text-teal-700 font-bold">${fmt(t.amount)}</span></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">目前沒有需要轉帳的差額。</div>';
  document.getElementById('expenseRecords').innerHTML = state.expenses.length? state.expenses.map(e=>`<div class="rounded-2xl bg-slate-50 p-4"><div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p class="font-bold">${escapeHtml(e.date)}｜${escapeHtml(e.title)} <span class="text-teal-700">${fmt(e.amount)}</span></p><p class="mt-1 text-sm text-slate-600">${escapeHtml(e.category)}｜付款人：${escapeHtml(state.members.find(m=>m.id===e.payer)?.name||'未知')}｜分攤：${e.splitIds.map(id=>state.members.find(m=>m.id===id)?.name||'未知').join('、')}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml(e.note||'')}</p></div><button onclick="deleteExpense('${e.id}')" class="rounded-full bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600">刪除</button></div></div>`).join('') : '<div class="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">尚無花費紀錄。</div>';
  renderExpenseCharts(res);
@@ -711,7 +724,7 @@ async function refreshAuth(){
   document.getElementById('copyLineBtn').onclick=async()=>{
   const {res,totalExpense,totalPrepaid,receivedPrepaid,avg}=calc();
   const ts=transfers(res);
-  const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【每人結算】\n${res.map(r=>`${r.name}：${r.balance>0?'應收':r.balance<0?'應付':'打平'} ${fmt(Math.abs(r.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`;
+  const txt=`【2026 趣瑞士金流結算】\n\n總預付款：${fmt(totalPrepaid)}\n已收到預付款：${fmt(receivedPrepaid)}\n總花費：${fmt(totalExpense)}\n剩餘 / 不足：${fmt(totalPrepaid-totalExpense)}\n平均每人負擔：${fmt(avg)}\n\n【群組／個人結算】\n${settlementRows(res).map(row=>`${row.name}（${row.memberNames}）：${row.balance>0?'應收':row.balance<0?'應付':'打平'} ${fmt(Math.abs(row.balance))}`).join('\n')}\n\n【轉帳建議】\n${ts.length?ts.map((t,i)=>`${i+1}. ${t.from} → ${t.to}：${fmt(t.amount)}`).join('\n'):'目前無需轉帳'}`;
   try{ await navigator.clipboard.writeText(txt); toast('已複製到剪貼簿'); }
   catch{ toast('複製失敗，請改用手動選取'); }
   };
